@@ -1,0 +1,114 @@
+{
+  "ui": {
+    "primary_bg": "#0A1F0A",
+    "cyber_teal": "#00FFCC",
+    "lime_green": "#ADFF2F",
+    "cyber_red": "#FF0055",
+    "gold": "#FFD700",
+    "glow_intensity": 0.5,
+    "logo_text": "🧬 BioEmpire ∞",
+    "logo_icon": "🧬"
+  },
+  "api": {
+    {
+  "GEMINI_API_KEY": "RENDER_SECRET_ICHIDAN_OLINADI",
+  "GROQ_API_KEY": "RENDER_SECRET_ICHIDAN_OLINADI"
+}
+    "primary_ai": "gemini",
+    "fallback_ai": "groq",
+    "groq_model": "mixtral-8x7b-32768",
+    "gemini_model": "gemini-1.5-flash",
+    "temperature": 0.7,
+    "max_tokens": 2048
+  },
+  "exchange_rates": {
+    "USD": 1.0,
+    "EUR": 0.92,
+    "BTC": 0.000015,
+    "SOL": 0.0075
+  },
+  "packages": {
+    "1_week": { "price_usd": 999, "status": "MONITORING", "desc": "1 haftalik asosiy davo" },
+    "1_month": { "price_usd": 9999, "status": "OPTIMIZED", "desc": "1 oylik kengaytirilgan davo" },
+    "3_month": { "price_usd": 299999, "status": "OPTIMIZED", "desc": "3 oylik premium davo" },
+    "6_month": { "price_usd": 599999, "status": "OPTIMIZED", "desc": "6 oylik elita davo + Analyst bonus" },
+    "1_year": { "price_usd": 1199999, "status": "IMMORTAL", "desc": "1 yillik ustun davo + Analyst dashboard" },
+    "3_year": { "price_usd": 2999999, "status": "IMMORTAL", "desc": "3 yillik mukammal davo + chegirma" },
+    "6_year": { "price_usd": 5999999, "status": "IMMORTAL", "desc": "6 yillik abadiy davo" },
+    "10_year": { "price_usd": 9999999, "status": "IMMORTAL", "desc": "10 yillik o'lmaslik matritsasi" },
+    "red_zone_vip": { "price_usd": 99000000, "status": "IMMORTAL", "desc": "QIZIL ZONA VIP - 100x qimmat" },
+    "gadget": { "price_usd": 1200, "status": "MONITORING", "desc": "BCI bilaguzuk va neyro-patch" },
+    "meds": { "price_usd": 650, "status": "MONITORING", "desc": "Kvant dorilar to'plami" }
+  },
+  "departments": [
+    { "id": 1, "name": "Brain Neural Synapse", "uz": "🧠 Neurologiya", "base_price": 250, "risk": "HIGH" },
+    { "id": 2, "name": "Pulmonary Bio-Breathing", "uz": "𫆩 Pulmonologiya", "base_price": 180, "risk": "MEDIUM" },
+    { "id": 3, "name": "Gastrointestinal Acid & Micro-biome", "uz": "🍕 Gastroenterologiya", "base_price": 150, "risk": "MEDIUM" },
+    { "id": 4, "name": "Quantum Cardio Synchronization", "uz": "🫀 Kardiologiya", "base_price": 300, "risk": "HIGH" },
+    { "id": 5, "name": "CRISPR DNA Telomere Tailoring", "uz": "🧬 Genetika", "base_price": 1200, "risk": "CRITICAL" },
+    { "id": 6, "name": "Nanobot Cellular Cleansing", "uz": "🤖 Nanomeditsina", "base_price": 850, "risk": "HIGH" },
+    { "id": 7, "name": "Oncological Marker Interception", "uz": "🛡 Onkologiya", "base_price": 950, "risk": "CRITICAL" },
+    { "id": 8, "name": "Advanced Gerontology Lifespan Extension", "uz": "⏳ Gerontologiya", "base_price": 2500, "risk": "CRITICAL" },
+    { "id": 9, "name": "Cybernetic Synaptic Prosthetics", "uz": "🦾 Kiber-Protezlash", "base_price": 4000, "risk": "EXTREME" },
+    { "id": 10, "name": "Autologous Stem Cell Swarm Customization", "uz": "🧫 Hujayraviy Terapiya", "base_price": 5000, "risk": "EXTREME" }
+  ],
+  "red_zone_departments": [
+    { "id": 101, "name": "Terminal Cancer Reversal", "uz": "☣️ Saraton To'liq Bartaraf", "base_price": 990000, "risk": "EXTREME" },
+    { "id": 102, "name": "Full Immune System Reset", "uz": "🔄 Immun Tizim Qayta Qurilishi", "base_price": 1500000, "risk": "EXTREME" },
+    { "id": 103, "name": "Nanite Repair Matrix", "uz": "⚙️ Nano-Tiklash Matritsasi", "base_price": 2500000, "risk": "EXTREME" },
+    { "id": 104, "name": "Alzheimer's Neural Rebuild", "uz": "🧠 Altsgeymer Neyro-Tiklash", "base_price": 3500000, "risk": "EXTREME" },
+    { "id": 105, "name": "Spinal Cord Regeneration", "uz": "🦴 Orqa Miya Regeneratsiyasi", "base_price": 4500000, "risk": "EXTREME" },
+    { "id": 106, "name": "Organ Bio-Printing", "uz": "🧫 Organ Bioprinting", "base_price": 5500000, "risk": "EXTREME" },
+    { "id": 107, "name": "Telomere Extension Therapy", "uz": "⏳ Telomer Uzaytirish", "base_price": 6500000, "risk": "EXTREME" },
+    { "id": 108, "name": "Brain-Computer Interface", "uz": "⚡ Miya-Kompyuter Interfeysi", "base_price": 7500000, "risk": "EXTREME" },
+    { "id": 109, "name": "Full Body Cybernetic", "uz": "🦾 To'liq Kiber-Gibrid", "base_price": 8500000, "risk": "EXTREME" },
+    { "id": 110, "name": "Absolute Immortality Matrix", "uz": "🌌 Mutlaq O'lmaslik", "base_price": 100000000, "risk": "EXTREME" }
+  ],
+  "ecommerce": {
+    "products": [
+      { "id": "prod_1", "name": "NeuroRegen X1", "price_usd": 50000, "desc": "Neyron regeneratsiya uchun", "category": "supplement" },
+      { "id": "prod_2", "name": "ImmunoBoost Pro", "price_usd": 75000, "desc": "Immun tizimni mustahkamlash", "category": "supplement" },
+      { "id": "prod_3", "name": "CardioSync Elite", "price_usd": 120000, "desc": "Yurak ritmini optimallashtirish", "category": "device" },
+      { "id": "prod_4", "name": "CRISPR NanoCure", "price_usd": 250000, "desc": "DNK darajasida tuzatish", "category": "therapy" },
+      { "id": "prod_5", "name": "TelomereX", "price_usd": 500000, "desc": "Telomer uzaytirish kompleksi", "category": "supplement" },
+      { "id": "prod_6", "name": "Nanobot Cleanse", "price_usd": 750000, "desc": "Nanobot hujayra tozalash", "category": "therapy" },
+      { "id": "prod_7", "name": "Immortality Elixir", "price_usd": 999999999, "desc": "O'lmaslik eliksiri - 1mlrd$", "category": "elite" },
+      { "id": "prod_8", "name": "BCI Headband Pro", "price_usd": 25000, "desc": "Miya-kompyuter interfeysi bosh tasmasi", "category": "device" },
+      { "id": "prod_9", "name": "Quantum Sleep Mask", "price_usd": 18000, "desc": "Kvant uyqu niqobi", "category": "device" },
+      { "id": "prod_10", "name": "Bio-Scan Watch", "price_usd": 35000, "desc": "Biometrik skaner soat", "category": "device" }
+    ]
+  },
+  "chat_price_usd": 49,
+  "camera_analysis_price_usd": 150,
+  "auto_learning_interval": 120,
+  "auto_marketing_interval": 120,
+  "auto_ads_optimizer_interval": 60,
+  "auto_decision_interval": 300,
+  "max_ai_history": 50,
+  "ai_autonomy": {
+    "enabled": true,
+    "max_price_change_percent": 30,
+    "min_profit_margin": 10,
+    "max_campaigns": 8,
+    "self_learning_enabled": true,
+    "auto_restock_enabled": true,
+    "decision_threshold": 0.7,
+    "ads_budget": 10000,
+    "min_campaign_performance": 0.05,
+    "ab_test_duration": 2
+  },
+  "admin": {
+    "username": "CEO",
+    "password_hash": "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f"
+  },
+  "legal": {
+    "terms_of_service": "BioEmpire xizmatlaridan foydalanish shartlari...",
+    "privacy_policy": "Shaxsiy ma'lumotlarni himoya qilish siyosati...",
+    "rules": [
+      "Tizimdan faqat shaxsiy maqsadlarda foydalaning.",
+      "Boshqa foydalanuvchilarni haqorat qilmang.",
+      "Soxta ma'lumotlar kiritmang.",
+      "Tizim tomonidan berilgan tavsiyalar faqat maʼlumot uchun, shifokor maslahatini o'rnini bosa olmaydi."
+    ]
+  }
+}
