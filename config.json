@@ -1,19 +1,17 @@
 {
   "ui": {
-    "primary_bg": "#0A1F0A",
-    "cyber_teal": "#00FFCC",
+    "primary_bg": "#E8F5E9",
+    "cyber_teal": "#66BB6A",
     "lime_green": "#ADFF2F",
-    "cyber_red": "#FF0055",
-    "gold": "#FFD700",
+    "cyber_red": "#E53935",
+    "gold": "#FFB300",
     "glow_intensity": 0.5,
     "logo_text": "🧬 BioEmpire ∞",
     "logo_icon": "🧬"
   },
   "api": {
-    {
-  "GEMINI_API_KEY": "RENDER_SECRET_ICHIDAN_OLINADI",
-  "GROQ_API_KEY": "RENDER_SECRET_ICHIDAN_OLINADI"
-}
+    "groq_api_key": "",
+    "gemini_api_key": "",
     "primary_ai": "gemini",
     "fallback_ai": "groq",
     "groq_model": "mixtral-8x7b-32768",
