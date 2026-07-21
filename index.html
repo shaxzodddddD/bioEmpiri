@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlterEgo Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f172a;
+            color: #fff;
+            text-align: center;
+            padding: 50px;
+            margin: 0;
+        }
+        .card {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 12px;
+            display: inline-block;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+            margin-top: 50px;
+        }
+        h1 { color: #38bdf8; margin-bottom: 10px; }
+        #status { font-weight: bold; font-size: 1.2em; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>🚀 AlterEgo Social Engine</h1>
+        <p>FastAPI Backend va HTML Frontend Render platformasida muvaffaqiyatli birlashdi!</p>
+        <div id="status">Ulanmoqda...</div>
+    </div>
+
+    <script>
+        // Sayt qayerda ochilganiga qarab WebSocket manzilini avtomatik aniqlash
+        const loc = window.location;
+        let wsStart = "ws://";
+        if (loc.protocol === "https:") {
+            wsStart = "wss://"; // Render'da xavfsiz ulanish (SSL) uchun wss ishlaydi
+        }
+
+        // Dinamik manzil hosil qilish: masalan wss://alterego.onrender.com/ws/stream
+        const endpoint = wsStart + loc.host + "/ws/stream";
+        console.log("Ulanish manzili:", endpoint);
+
+        const socket = new WebSocket(endpoint);
+
+        socket.onopen = () => {
+            document.getElementById('status').innerText = "🟢 Serverga real-time (WebSocket) ulandi!";
+            document.getElementById('status').style.color = "#4ade80";
+        };
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            console.log("Serverdan kelgan ma'lumot:", data);
+        };
+
+        socket.onclose = () => {
+            document.getElementById('status').innerText = "🔴 Server bilan ulanish uzildi.";
+            document.getElementById('status').style.color = "#f87171";
+        };
+
+        socket.onerror = (error) => {
+            console.error("WebSocket xatoligi:", error);
+        };
+    </script>
+</body>
+</html>
