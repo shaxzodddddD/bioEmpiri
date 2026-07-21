@@ -32,7 +32,7 @@ GEMINI_MODEL = "gemini-1.5-flash"
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-app = FastAPI(title="BioEmpire V9.7")
+app = FastAPI(title="BioEmpire V9.8")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -168,20 +168,24 @@ async def call_ai_api(messages: List[dict]) -> Optional[str]:
 async def root():
     return HTML
 
-# ===== AUTH =====
+# ===== AUTH - RO'YXATDAN O'TISH =====
 @app.post("/api/v2/auth/signup")
 async def signup(user: UserRegister):
     async with db_lock:
+        # 1. Username mavjudligini tekshirish
         if user.username in db["users"]:
             raise HTTPException(status_code=400, detail="Bu username allaqachon band.")
         
+        # 2. Valyutani aniqlash
         curr = user.currency.upper()
         if curr not in ["USD", "EUR", "BTC", "SOL"]:
             curr = "USD"
         
+        # 3. Boshlang'ich balans
         rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
         initial_balance = 25000.0 * rates.get(curr, 1.0)
         
+        # 4. Foydalanuvchini qo'shish
         db["users"][user.username] = {
             "email": user.email,
             "password_hash": hash_password(user.password),
@@ -195,8 +199,10 @@ async def signup(user: UserRegister):
             "registered_at": datetime.now().isoformat()
         }
         
+        # 5. Aktiv foydalanuvchilar sonini yangilash
         db["system_vault"]["active_users"] = len(db["users"])
         
+        # 6. Faylga saqlash
         if not save_db(db):
             raise HTTPException(status_code=500, detail="Ma'lumotlarni saqlashda xatolik.")
         
@@ -207,16 +213,21 @@ async def signup(user: UserRegister):
             "currency": curr
         }
 
+# ===== AUTH - KIRISH =====
 @app.post("/api/v2/auth/signin")
 async def signin(user: UserLogin):
     async with db_lock:
+        # 1. Foydalanuvchi mavjudligini tekshirish
         if user.username not in db["users"]:
             raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
         
         target = db["users"][user.username]
+        
+        # 2. Parolni tekshirish
         if target["password_hash"] != hash_password(user.password):
             raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
         
+        # 3. Muvaffaqiyatli javob
         return {
             "status": "success",
             "username": user.username,
@@ -415,7 +426,7 @@ HTML = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧬 BioEmpire V9.7</title>
+    <title>🧬 BioEmpire V9.8</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #E8F5E9; font-family: 'Segoe UI', system-ui, sans-serif; margin:0; }
