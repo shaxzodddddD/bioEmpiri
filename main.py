@@ -5,73 +5,34 @@ import asyncio
 import hashlib
 import httpx
 import base64
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from datetime import datetime
+from typing import List, Optional
 from pydantic import BaseModel, Field
-from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, File, UploadFile, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# ==========================================
-# GEMINI AI (eski kutubxona, lekin ishlaydi)
-# ==========================================
+# -------------------- GEMINI --------------------
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
-    print("✅ Gemini AI mavjud")
 except ImportError:
     GEMINI_AVAILABLE = False
-    print("⚠️ Gemini AI o‘rnatilmagan")
 
-# ==========================================
-# KONFIGURATSIYA
-# ==========================================
-CONFIG_FILE = "config.json"
-if os.path.exists(CONFIG_FILE):
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-        CONFIG = json.load(f)
-else:
-    CONFIG = {
-        "exchange_rates": {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075},
-        "packages": {},
-        "departments": [],
-        "red_zone_departments": [],
-        "ecommerce": {"products": []},
-        "chat_price_usd": 49,
-        "camera_analysis_price_usd": 150,
-        "admin": {"username": "CEO", "password_hash": hashlib.sha256("12345678".encode()).hexdigest()}
-    }
-
-EXCHANGE_RATES = CONFIG.get("exchange_rates", {"USD": 1.0})
-CHAT_PRICE_USD = CONFIG.get("chat_price_usd", 49)
-CAMERA_PRICE_USD = CONFIG.get("camera_analysis_price_usd", 150)
-ADMIN_USERNAME = CONFIG.get("admin", {}).get("username", "CEO")
-ADMIN_PASSWORD_HASH = CONFIG.get("admin", {}).get("password_hash", hashlib.sha256("12345678".encode()).hexdigest())
-
-# API kalitlari – muhit o‘zgaruvchilaridan olinadi
+# -------------------- CONFIG --------------------
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-1.5-flash"
 
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    print("✅ Gemini API sozlandi")
 
-app = FastAPI(title="BioEmpire V9.5")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# ==========================================
-# MA'LUMOTLAR BAZASI (JSON fayl)
-# ==========================================
+# -------------------- DATABASE --------------------
 DB_FILE = "database_log.json"
-db_lock = asyncio.Lock()
 
 def load_db():
     if os.path.exists(DB_FILE):
@@ -79,140 +40,29 @@ def load_db():
             return json.load(f)
     return {
         "users": {},
-        "feed": [],
         "social_posts": [],
         "system_vault": {"total_revenue": 0, "active_users": 0},
         "notifications": [],
         "user_activity": {},
         "product_sales": [],
         "ai_logs": [],
-        "ads_performance": {},
-        "comments": {},
-        "follows": {}
+        "ads_performance": {}
     }
 
 def save_db(data):
     with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 db = load_db()
 
-# ==========================================
-# YORDAMCHI FUNKSIYALAR
-# ==========================================
-def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+# -------------------- HELPERS --------------------
+def hash_password(pw: str) -> str:
+    return hashlib.sha256(pw.encode()).hexdigest()
 
-def generate_post_id() -> str:
-    return f"post_{random.randint(10000, 99999)}_{int(datetime.now().timestamp())}"
+def generate_post_id():
+    return f"post_{random.randint(10000,99999)}_{int(datetime.now().timestamp())}"
 
-def generate_social_post(username: str, content: str, is_ai: bool = False) -> dict:
-    return {
-        "id": generate_post_id(),
-        "username": "🧬 BioEmpire_AI" if is_ai else username,
-        "content": content,
-        "timestamp": datetime.now().strftime("%H:%M:%S"),
-        "likes": random.randint(5, 50) if is_ai else 0,
-        "comments": [],
-        "is_ai": is_ai
-    }
-
-def generate_notification(username: str, message: str, type: str = "info") -> dict:
-    return {
-        "id": generate_post_id(),
-        "username": username,
-        "message": message,
-        "type": type,
-        "timestamp": datetime.now().isoformat(),
-        "read": False
-    }
-
-def add_social_post(post: dict):
-    db["social_posts"].insert(0, post)
-    if len(db["social_posts"]) > 100:
-        db["social_posts"].pop()
-    save_db(db)
-
-def add_notification(notification: dict):
-    db["notifications"].insert(0, notification)
-    if len(db["notifications"]) > 100:
-        db["notifications"].pop()
-    save_db(db)
-
-def track_user_activity(username: str, action: str, details: dict = None):
-    if username not in db["user_activity"]:
-        db["user_activity"][username] = {
-            "last_active": datetime.now().isoformat(),
-            "actions": [],
-            "total_spent": 0.0,
-            "packages_bought": 0
-        }
-    activity = db["user_activity"][username]
-    activity["last_active"] = datetime.now().isoformat()
-    activity["actions"].append({
-        "action": action,
-        "timestamp": datetime.now().isoformat(),
-        "details": details or {}
-    })
-    if len(activity["actions"]) > 100:
-        activity["actions"] = activity["actions"][-100:]
-    save_db(db)
-
-def ai_log(message: str, level: str = "INFO"):
-    db["ai_logs"].append({
-        "timestamp": datetime.now().isoformat(),
-        "level": level,
-        "message": message
-    })
-    if len(db["ai_logs"]) > 500:
-        db["ai_logs"] = db["ai_logs"][-500:]
-    save_db(db)
-
-# ==========================================
-# AI API CALLS
-# ==========================================
-async def call_groq_api(messages: List[dict]) -> Optional[str]:
-    if not GROQ_API_KEY:
-        return None
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-    data = {
-        "model": "mixtral-8x7b-32768",
-        "messages": messages,
-        "temperature": 0.7,
-        "max_tokens": 2048
-    }
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, headers=headers, json=data)
-            if response.status_code == 200:
-                return response.json()["choices"][0]["message"]["content"]
-            return None
-    except:
-        return None
-
-async def call_gemini_api(messages: List[dict]) -> Optional[str]:
-    if not GEMINI_AVAILABLE or not GEMINI_API_KEY:
-        return None
-    try:
-        model = genai.GenerativeModel(GEMINI_MODEL)
-        user_message = messages[-1]["content"] if messages else ""
-        context = "\n".join([m["content"] for m in messages if m["role"] == "system"])
-        full_prompt = f"{context}\n\nFoydalanuvchi: {user_message}" if context else user_message
-        response = await asyncio.to_thread(model.generate_content, full_prompt)
-        return response.text if response and response.text else None
-    except:
-        return None
-
-async def call_ai_api(messages: List[dict]) -> Optional[str]:
-    response = await call_gemini_api(messages)
-    if response:
-        return response
-    return await call_groq_api(messages)
-
-# ==========================================
-# PYDANTIC MODELLAR
-# ==========================================
+# -------------------- PYDANTIC MODELS --------------------
 class UserRegister(BaseModel):
     username: str = Field(..., min_length=2, max_length=30)
     email: str
@@ -239,22 +89,46 @@ class CommentRequest(BaseModel):
 class AIChatRequest(BaseModel):
     username: str
     message: str
-    context: Optional[str] = None
 
 class CameraAnalysisRequest(BaseModel):
     username: str
     department_id: int
     image_data: Optional[str] = None
 
-# ==========================================
-# HTML (to‘liq interfeys)
-# ==========================================
-HTML = """<!DOCTYPE html>
+# -------------------- AI CALLS --------------------
+async def call_ai_api(messages: List[dict]) -> Optional[str]:
+    # Gemini
+    if GEMINI_AVAILABLE and GEMINI_API_KEY:
+        try:
+            model = genai.GenerativeModel(GEMINI_MODEL)
+            prompt = "\n".join([m["content"] for m in messages])
+            response = await asyncio.to_thread(model.generate_content, prompt)
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            print("Gemini error:", e)
+    # Groq
+    if GROQ_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+                    json={"model": "mixtral-8x7b-32768", "messages": messages, "temperature": 0.7, "max_tokens": 2048}
+                )
+                if resp.status_code == 200:
+                    return resp.json()["choices"][0]["message"]["content"]
+        except Exception as e:
+            print("Groq error:", e)
+    return None
+
+# -------------------- HTML (to'liq) --------------------
+HTML_PAGE = """<!DOCTYPE html>
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧬 BioEmpire V9.5</title>
+    <title>🧬 BioEmpire</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #E8F5E9; font-family: 'Segoe UI', system-ui, sans-serif; }
@@ -317,7 +191,6 @@ HTML = """<!DOCTYPE html>
 </head>
 <body>
 
-<!-- AUTH -->
 <div id="auth-gate">
     <div class="auth-card">
         <div class="text-center mb-3"><span class="text-5xl animate-pulse">🧬</span></div>
@@ -353,7 +226,6 @@ HTML = """<!DOCTYPE html>
     </div>
 </div>
 
-<!-- DASHBOARD -->
 <div id="main-dashboard" style="display:none;">
     <header class="fixed top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-[#66BB6A33] px-4 py-2 flex items-center justify-between">
         <div class="flex items-center gap-3 cursor-pointer" onclick="location.reload()">
@@ -361,20 +233,12 @@ HTML = """<!DOCTYPE html>
             <span class="text-xl font-black text-[#2E7D32]">BioEmpire ∞</span>
         </div>
         <div class="flex items-center gap-4">
-            <div class="notif-bell relative" onclick="toggleNotifications()">
-                🔔 <span class="notif-badge" id="notif-count">0</span>
-                <div class="notif-dropdown" id="notif-dropdown">
-                    <div class="font-bold text-[#43A047] text-xs mb-2">📬 Bildirishnomalar</div>
-                    <div id="notif-list"></div>
-                </div>
-            </div>
             <span id="header-user" class="text-xs text-[#43A047] hidden"></span>
             <button id="logout-btn" class="btn-red btn-sm hidden" onclick="logout()">Chiqish</button>
         </div>
     </header>
 
     <div class="flex pt-[68px]">
-        <!-- SIDEBAR -->
         <aside class="sidebar" id="main-sidebar">
             <div class="flex items-center gap-3 p-3 rounded-xl bg-[#F1F8E9] border border-[#66BB6A33] mb-4">
                 <div class="avatar-lg" id="sidebar-avatar">🧬</div>
@@ -387,44 +251,29 @@ HTML = """<!DOCTYPE html>
                     <div class="text-sm font-bold text-[#43A047]" id="sidebar-balance">0.00</div>
                 </div>
             </div>
-            <div class="text-[10px] text-[#43A047] font-bold uppercase tracking-wider mb-2">📋 Bo'limlar</div>
-            <div id="sidebar-depts"></div>
-            <div class="sidebar-divider border-t border-[#66BB6A33] my-3"></div>
+            <button class="sidebar-btn active" data-panel="panel-consult" onclick="switchPanel('panel-consult', this)"><span class="icon">🩺</span><span class="btn-text">Konsultatsiya</span></button>
+            <button class="sidebar-btn" data-panel="panel-social" onclick="switchPanel('panel-social', this)"><span class="icon">📡</span><span class="btn-text">Ijtimoiy</span></button>
             <button class="sidebar-btn" data-panel="panel-profile" onclick="switchPanel('panel-profile', this)"><span class="icon">👤</span><span class="btn-text">Profil</span></button>
-            <button class="sidebar-btn" data-panel="panel-consult" onclick="switchPanel('panel-consult', this)"><span class="icon">🩺</span><span class="btn-text">Konsultatsiya</span></button>
-            <button class="sidebar-btn" data-panel="panel-social" onclick="switchPanel('panel-social', this)"><span class="icon">📡</span><span class="btn-text">Ijtimoiy</span><span class="badge" id="feed-badge">0</span></button>
             <button class="sidebar-btn" data-panel="panel-packages" onclick="switchPanel('panel-packages', this)"><span class="icon">📦</span><span class="btn-text">Paketlar</span></button>
             <button class="sidebar-btn" data-panel="panel-stats" onclick="switchPanel('panel-stats', this)"><span class="icon">📊</span><span class="btn-text">Statistika</span></button>
-            <button class="sidebar-btn" data-panel="panel-ads" onclick="switchPanel('panel-ads', this)"><span class="icon">📈</span><span class="btn-text">AI ADS</span></button>
             <button class="sidebar-btn" data-panel="panel-admin" onclick="switchPanel('panel-admin', this)"><span class="icon">⚙️</span><span class="btn-text">Admin</span></button>
-            <button class="sidebar-btn" data-panel="panel-ceo" onclick="switchPanel('panel-ceo', this)"><span class="icon">👑</span><span class="btn-text">CEO</span></button>
         </aside>
 
-        <!-- CONTENT -->
         <main class="flex-1 min-w-0 p-4 max-w-full">
-            <!-- PANEL: Konsultatsiya -->
             <div id="panel-consult" class="panel active">
                 <div class="glass p-5">
                     <h2 class="text-xl font-bold text-[#43A047] mb-3">🩺 AI KONSULTATSIYA</h2>
                     <div class="mb-4">
-                        <div class="flex gap-2 flex-wrap">
-                            <button class="btn-cyber btn-sm" onclick="startCamera()">📷 Kamerani yoqish</button>
-                            <button class="btn-gold btn-sm" onclick="captureAndAnalyze()">🔬 Suratga olib tahlil</button>
-                            <button class="btn-red btn-sm" onclick="stopCamera()">⏹ To'xtatish</button>
-                        </div>
+                        <button class="btn-cyber btn-sm" onclick="startCamera()">📷 Kamerani yoqish</button>
+                        <button class="btn-gold btn-sm" onclick="captureAndAnalyze()">🔬 Suratga olib tahlil</button>
+                        <button class="btn-red btn-sm" onclick="stopCamera()">⏹ To'xtatish</button>
                         <video id="camera-preview" autoplay playsinline style="display:none;"></video>
                         <div id="camera-placeholder" class="bg-gray-100 rounded-xl p-4 text-center text-gray-400 text-sm border border-dashed border-[#66BB6A33]">Kamera o'chirilgan</div>
                         <div id="camera-result" class="mt-2 text-sm text-[#43A047]"></div>
                     </div>
-                    <div class="mb-4">
-                        <button class="btn-cyber btn-sm" onclick="startVoice()">🎤 Ovoz bilan gapirish</button>
-                        <button class="btn-red btn-sm" onclick="stopVoice()">⏹ To'xtatish</button>
-                        <span id="voice-status" class="text-sm text-gray-500"></span>
-                        <div id="voice-transcript" class="mt-2 p-3 bg-gray-50 rounded-xl text-sm text-gray-700 min-h-[48px] border border-[#66BB6A33]">Ovoz matni...</div>
-                    </div>
                     <div>
                         <div class="chat-terminal" id="consult-chat">
-                            <div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing yoki gapiring.</div>
+                            <div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing.</div>
                         </div>
                         <div class="flex gap-2 mt-3">
                             <input id="consult-input" type="text" placeholder="Xabar yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" />
@@ -434,7 +283,6 @@ HTML = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- PANEL: Ijtimoiy tarmoq -->
             <div id="panel-social" class="panel">
                 <div class="glass p-5">
                     <h2 class="text-xl font-bold text-[#43A047] mb-3">📡 Ijtimoiy tarmoq</h2>
@@ -446,7 +294,6 @@ HTML = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- PANEL: Profil -->
             <div id="panel-profile" class="panel">
                 <div class="glass p-5">
                     <h2 class="text-xl font-bold text-[#43A047] mb-3">👤 Profil</h2>
@@ -454,7 +301,6 @@ HTML = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- PANEL: Paketlar -->
             <div id="panel-packages" class="panel">
                 <div class="glass p-5">
                     <h2 class="text-xl font-bold text-[#FFB300] mb-3">📦 Paketlar</h2>
@@ -462,25 +308,14 @@ HTML = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- PANEL: Statistika -->
             <div id="panel-stats" class="panel">
                 <div class="glass p-5">
                     <h2 class="text-xl font-bold text-[#43A047] mb-3">📊 Statistika</h2>
-                    <div id="stats-content" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-                    <div class="mt-4"><h3 class="text-sm font-bold text-[#43A047]">🏅 Salomatlik reytingi</h3><div id="health-ranking" class="max-h-[200px] overflow-y-auto"></div></div>
+                    <div id="stats-content"></div>
+                    <div class="mt-4"><h3 class="text-sm font-bold text-[#43A047]">🏅 Salomatlik reytingi</h3><div id="health-ranking"></div></div>
                 </div>
             </div>
 
-            <!-- PANEL: AI ADS -->
-            <div id="panel-ads" class="panel">
-                <div class="glass p-5">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">📈 AI ADS</h2>
-                    <div id="ads-performance" class="space-y-2 max-h-[500px] overflow-y-auto"></div>
-                    <button class="btn-outline btn-sm mt-3" onclick="loadAdsPerformance()">🔄 Yangilash</button>
-                </div>
-            </div>
-
-            <!-- PANEL: Admin -->
             <div id="panel-admin" class="panel">
                 <div class="glass p-5">
                     <h2 class="text-xl font-bold text-[#FFB300] mb-3">⚙️ Admin</h2>
@@ -490,17 +325,9 @@ HTML = """<!DOCTYPE html>
                         <button class="btn-cyber btn-sm" onclick="adminLogin()">🔐 Kirish</button>
                     </div>
                     <div id="admin-content" class="hidden">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" id="admin-stats-grid"></div>
+                        <div id="admin-stats-grid" class="grid grid-cols-2 gap-3 mb-4"></div>
                         <div id="admin-data" class="mt-3 max-h-[300px] overflow-y-auto text-sm"></div>
                     </div>
-                </div>
-            </div>
-
-            <!-- PANEL: CEO -->
-            <div id="panel-ceo" class="panel">
-                <div class="glass p-5">
-                    <h2 class="text-xl font-bold text-[#FFB300] mb-3">👑 CEO Dashboard</h2>
-                    <div id="ceo-content"></div>
                 </div>
             </div>
         </main>
@@ -508,21 +335,13 @@ HTML = """<!DOCTYPE html>
 </div>
 
 <script>
-// ============================================================
-// GLOBAL STATE
-// ============================================================
 let currentUser = null;
 let authMode = 'signup';
 let tokenBalance = 100;
-let notifCount = 0;
 let cameraStream = null;
 let cameraActive = false;
-let recognition = null;
-let voiceActive = false;
 
-// ============================================================
-// AUTH
-// ============================================================
+// Auth
 function switchAuth(mode) {
     authMode = mode;
     document.getElementById('auth-title').innerText = mode === 'signup' ? '🔐 RO\'YXATDAN O\'TISH' : '🔐 KIRISH';
@@ -564,28 +383,15 @@ async function executeAuth() {
         loadSocialFeed();
         loadHealthRanking();
         loadStats();
-        loadAdsPerformance();
         renderPackages();
-        setInterval(loadSocialFeed, 8000);
-        setInterval(loadHealthRanking, 15000);
-        setInterval(loadAdsPerformance, 30000);
     } catch (e) { errEl.innerText = "Tarmoq xatosi: " + e.message; }
 }
 
 function logout() {
     currentUser = null;
-    document.getElementById('auth-gate').style.display = 'flex';
-    document.getElementById('main-dashboard').style.display = 'none';
-    document.getElementById('header-user').className = 'hidden';
-    document.getElementById('logout-btn').className = 'hidden';
-    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); }
-    if (recognition) { recognition.stop(); }
     location.reload();
 }
 
-// ============================================================
-// PANEL SWITCH
-// ============================================================
 function switchPanel(panelId, btn) {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById(panelId).classList.add('active');
@@ -594,13 +400,8 @@ function switchPanel(panelId, btn) {
     if (panelId === 'panel-profile') loadProfile();
     if (panelId === 'panel-social') loadSocialFeed();
     if (panelId === 'panel-stats') { loadStats(); loadHealthRanking(); }
-    if (panelId === 'panel-ads') loadAdsPerformance();
-    if (panelId === 'panel-packages') renderPackages();
 }
 
-// ============================================================
-// PROFILE
-// ============================================================
 async function loadProfile() {
     if (!currentUser) return;
     try {
@@ -610,44 +411,28 @@ async function loadProfile() {
         document.getElementById('sidebar-balance').innerText = data.balance.toFixed(2);
         document.getElementById('sidebar-status').innerText = data.status;
         document.getElementById('sidebar-avatar').innerText = data.avatar || '🧬';
-
-        const container = document.getElementById('profile-content');
-        const statusClass = data.status === 'WARNING' ? 'status-warning' : data.status === 'RED_ZONE' ? 'status-red' : data.status === 'OPTIMIZED' ? 'status-optimized' : 'status-immortal';
-        container.innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]">
-                    <div class="flex items-center gap-4">
-                        <div class="avatar-lg text-4xl">${data.avatar || '🧬'}</div>
-                        <div><div class="text-xl font-bold">${currentUser}</div><div class="text-sm text-gray-500">${data.email}</div></div>
-                    </div>
-                    <div class="mt-4 space-y-1 text-sm">
-                        <p><span class="text-gray-500">Holat:</span> <span class="status-badge ${statusClass}">${data.status}</span></p>
-                        <p><span class="text-gray-500">Balans:</span> <strong class="text-[#43A047]">${data.balance.toFixed(2)} ${data.currency}</strong></p>
-                        <p><span class="text-gray-500">Salomatlik:</span> <strong class="text-[#43A047]">${data.health_score.toFixed(1)}%</strong></p>
-                        <p><span class="text-gray-500">Bio:</span> ${data.bio || 'Yo\'q'}</p>
-                    </div>
+        document.getElementById('profile-content').innerHTML = `
+            <div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]">
+                <div class="flex items-center gap-4">
+                    <div class="avatar-lg text-4xl">${data.avatar || '🧬'}</div>
+                    <div><div class="text-xl font-bold">${currentUser}</div><div class="text-sm text-gray-500">${data.email}</div></div>
                 </div>
-                <div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]">
-                    <h3 class="text-sm font-bold text-[#43A047]">📊 Statistika</h3>
-                    <div class="mt-3 space-y-1 text-sm">
-                        <p><span class="text-gray-500">Tokenlar:</span> <strong>${tokenBalance}</strong></p>
-                    </div>
+                <div class="mt-4 space-y-1 text-sm">
+                    <p><span class="text-gray-500">Holat:</span> <span class="status-badge status-warning">${data.status}</span></p>
+                    <p><span class="text-gray-500">Balans:</span> <strong class="text-[#43A047]">${data.balance.toFixed(2)} ${data.currency}</strong></p>
+                    <p><span class="text-gray-500">Salomatlik:</span> <strong class="text-[#43A047]">${data.health_score}%</strong></p>
                 </div>
             </div>
         `;
     } catch (e) { console.error(e); }
 }
 
-// ============================================================
-// SOCIAL FEED
-// ============================================================
 async function loadSocialFeed() {
     try {
         const res = await fetch('/api/v2/social/posts');
         const posts = await res.json();
         const container = document.getElementById('social-feed');
         container.innerHTML = '';
-        document.getElementById('feed-badge').innerText = posts.length;
         posts.forEach(p => {
             const div = document.createElement('div');
             div.className = 'feed-item';
@@ -668,26 +453,20 @@ async function createSocialPost() {
     const input = document.getElementById('social-input');
     if (!input.value.trim() || !currentUser) return;
     try {
-        const res = await fetch('/api/v2/social/post', {
+        await fetch('/api/v2/social/post', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: currentUser, content: input.value })
         });
-        if (res.ok) {
-            input.value = '';
-            loadSocialFeed();
-        }
+        input.value = '';
+        loadSocialFeed();
     } catch (e) { alert('Xatolik: ' + e.message); }
 }
 
 async function likePost(pid) {
     if (!currentUser) return;
     try {
-        await fetch('/api/v2/social/like', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: currentUser, post_id: pid })
-        });
+        await fetch('/api/v2/social/like', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, post_id: pid }) });
         loadSocialFeed();
     } catch (e) {}
 }
@@ -697,29 +476,18 @@ async function commentPost(pid) {
     const comment = prompt('Komment:');
     if (!comment) return;
     try {
-        await fetch('/api/v2/social/comment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: currentUser, post_id: pid, comment: comment })
-        });
+        await fetch('/api/v2/social/comment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, post_id: pid, comment: comment }) });
         loadSocialFeed();
     } catch (e) { alert(e.message); }
 }
 
-// ============================================================
-// CONSULTATION (AI Chat + Camera + Voice)
-// ============================================================
 async function sendConsult() {
     const input = document.getElementById('consult-input');
     const msg = input.value.trim();
     if (!msg || !currentUser) return;
-    if (tokenBalance < 3) { alert('Token yetarli emas!'); return; }
-    tokenBalance -= 3;
     const box = document.getElementById('consult-chat');
     box.innerHTML += `<div class="chat-msg user">${msg}</div>`;
     input.value = '';
-    box.scrollTop = box.scrollHeight;
-
     try {
         const res = await fetch('/api/v2/ai/chat', {
             method: 'POST',
@@ -729,7 +497,6 @@ async function sendConsult() {
         const data = await res.json();
         if (data.success) {
             box.innerHTML += `<div class="chat-msg ai">${data.response}</div>`;
-            loadProfile();
         } else {
             box.innerHTML += `<div class="chat-msg warning">${data.message}</div>`;
         }
@@ -737,13 +504,6 @@ async function sendConsult() {
     box.scrollTop = box.scrollHeight;
 }
 
-// Enter
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && document.activeElement?.id === 'consult-input') sendConsult();
-    if (e.key === 'Enter' && document.activeElement?.id === 'social-input') createSocialPost();
-});
-
-// Camera
 async function startCamera() {
     try {
         const video = document.getElementById('camera-preview');
@@ -767,15 +527,11 @@ async function captureAndAnalyze() {
     if (!currentUser) return;
     const video = document.getElementById('camera-preview');
     if (!cameraActive || video.style.display === 'none') { alert('Kamerani yoqing!'); return; }
-    if (tokenBalance < 10) { alert('Token yetarli emas! (10 token)'); return; }
-    tokenBalance -= 10;
-
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
     const base64 = canvas.toDataURL('image/jpeg');
-
     const result = document.getElementById('camera-result');
     result.innerText = '⏳ Tahlil...';
     try {
@@ -785,48 +541,11 @@ async function captureAndAnalyze() {
             body: JSON.stringify({ username: currentUser, department_id: 1, image_data: base64 })
         });
         const data = await res.json();
-        if (data.success) { result.innerText = '🔬 ' + data.analysis; loadProfile(); }
+        if (data.success) { result.innerText = '🔬 ' + data.analysis; }
         else { result.innerText = '❌ ' + data.message; }
     } catch (e) { result.innerText = '❌ ' + e.message; }
 }
 
-// Voice
-function startVoice() {
-    if (!('webkitSpeechRecognition' in window)) { alert('Brauzer ovozni qo‘llab-quvvatlamaydi'); return; }
-    if (voiceActive) { stopVoice(); return; }
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SpeechRecognition();
-    recognition.lang = 'uz-UZ';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.onstart = () => {
-        voiceActive = true;
-        document.getElementById('voice-status').innerHTML = '<span class="voice-indicator"></span> Aytishni boshlang...';
-    };
-    recognition.onresult = (event) => {
-        let final = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) final += event.results[i][0].transcript;
-        }
-        if (final) {
-            document.getElementById('voice-transcript').innerText = final;
-            document.getElementById('consult-input').value = final;
-            sendConsult();
-        }
-    };
-    recognition.onerror = (e) => { console.error(e); stopVoice(); };
-    recognition.start();
-}
-
-function stopVoice() {
-    if (recognition) { recognition.stop(); recognition = null; }
-    voiceActive = false;
-    document.getElementById('voice-status').innerHTML = '';
-}
-
-// ============================================================
-// HEALTH RANKING
-// ============================================================
 async function loadHealthRanking() {
     try {
         const res = await fetch('/api/v2/health/ranking');
@@ -842,51 +561,29 @@ async function loadHealthRanking() {
     } catch (e) {}
 }
 
-// ============================================================
-// STATS
-// ============================================================
 async function loadStats() {
     try {
         const res = await fetch('/api/v2/system/stats');
         const data = await res.json();
         const container = document.getElementById('stats-content');
         container.innerHTML = `
-            <div class="bg-white p-4 rounded-xl text-center shadow"><div class="text-2xl font-bold text-[#43A047]">$${data.total_revenue || 0}</div><div class="text-xs text-gray-500">Daromad</div></div>
-            <div class="bg-white p-4 rounded-xl text-center shadow"><div class="text-2xl font-bold text-[#43A047]">${data.active_users || 0}</div><div class="text-xs text-gray-500">Aktiv</div></div>
-            <div class="bg-white p-4 rounded-xl text-center shadow"><div class="text-2xl font-bold text-[#FFB300]">${data.total_sales || 0}</div><div class="text-xs text-gray-500">Sotuv</div></div>
-            <div class="bg-white p-4 rounded-xl text-center shadow"><div class="text-2xl font-bold text-[#43A047]">${data.total_social_posts || 0}</div><div class="text-xs text-gray-500">Post</div></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white p-4 rounded-xl text-center shadow"><div class="text-2xl font-bold text-[#43A047]">$${data.total_revenue || 0}</div><div class="text-xs text-gray-500">Daromad</div></div>
+                <div class="bg-white p-4 rounded-xl text-center shadow"><div class="text-2xl font-bold text-[#43A047]">${data.active_users || 0}</div><div class="text-xs text-gray-500">Aktiv</div></div>
+            </div>
         `;
     } catch (e) {}
 }
 
-// ============================================================
-// ADS PERFORMANCE
-// ============================================================
-async function loadAdsPerformance() {
-    try {
-        const res = await fetch('/api/v2/ai/ads-performance');
-        const data = await res.json();
-        const container = document.getElementById('ads-performance');
-        container.innerHTML = '<div class="text-gray-400 text-sm">Hozircha kampaniya yo\'q</div>';
-    } catch (e) {}
-}
-
-// ============================================================
-// PACKAGES
-// ============================================================
 function renderPackages() {
     const container = document.getElementById('package-grid');
     container.innerHTML = `
         <div class="package-card"><div class="pkg-name">1 Haftalik</div><div class="pkg-price">$999</div></div>
         <div class="package-card"><div class="pkg-name">1 Oylik</div><div class="pkg-price">$9,999</div></div>
-        <div class="package-card"><div class="pkg-name">3 Oylik</div><div class="pkg-price">$299,999</div></div>
         <div class="package-card"><div class="pkg-name">1 Yillik</div><div class="pkg-price">$1,199,999</div></div>
     `;
 }
 
-// ============================================================
-// ADMIN
-// ============================================================
 async function adminLogin() {
     const user = document.getElementById('admin-user').value.trim();
     const pass = document.getElementById('admin-pass').value.trim();
@@ -909,214 +606,165 @@ async function adminLoadDashboard() {
     try {
         const res = await fetch(`/api/v2/admin/dashboard?username=CEO&password=12345678`);
         const data = await res.json();
-        const grid = document.getElementById('admin-stats-grid');
-        grid.innerHTML = `
+        document.getElementById('admin-stats-grid').innerHTML = `
             <div class="bg-white p-4 rounded-xl text-center"><div class="text-2xl font-bold">${data.total_users || 0}</div><div class="text-xs text-gray-500">Foydalanuvchilar</div></div>
             <div class="bg-white p-4 rounded-xl text-center"><div class="text-2xl font-bold text-[#FFB300]">$${data.total_revenue || 0}</div><div class="text-xs text-gray-500">Daromad</div></div>
         `;
         document.getElementById('admin-data').innerHTML = `<pre class="text-xs">${JSON.stringify(data, null, 2)}</pre>`;
     } catch (e) {}
 }
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && document.activeElement?.id === 'consult-input') sendConsult();
+});
 </script>
 </body>
 </html>"""
 
 # ==========================================
-# ENDPOINTLAR
+# ENDPOINTS
 # ==========================================
 @app.get("/", response_class=HTMLResponse)
-@app.head("/", response_class=HTMLResponse)
 async def root():
-    return HTML
+    return HTML_PAGE
 
-# AUTH
 @app.post("/api/v2/auth/signup")
 async def signup(user: UserRegister):
-    async with db_lock:
-        if user.username in db["users"]:
-            raise HTTPException(status_code=400, detail="Bu username allaqachon band.")
-        curr = user.currency.upper()
-        if curr not in EXCHANGE_RATES:
-            curr = "USD"
-        initial_balance = 25000.0 * EXCHANGE_RATES[curr]
-        db["users"][user.username] = {
-            "email": user.email,
-            "password_hash": hash_password(user.password),
-            "currency": curr,
-            "balance": initial_balance,
-            "status": "WARNING",
-            "department": "None",
-            "health_score": 85.0,
-            "last_purchase": None,
-            "packages": [],
-            "avatar": "🧬",
-            "bio": "BioEmpire tizimiga yangi qo'shildim",
-            "full_name": "",
-            "age": None,
-            "gender": "",
-            "phone": "",
-            "address": "",
-            "social_links": {},
-            "registered_at": datetime.now().isoformat()
-        }
-        db["system_vault"]["active_users"] = len(db["users"])
-        save_db(db)
-        return {"status": "success", "username": user.username, "balance": initial_balance, "currency": curr}
+    if user.username in db["users"]:
+        raise HTTPException(400, "Bu username allaqachon band.")
+    currency = user.currency.upper()
+    if currency not in ["USD", "EUR", "BTC", "SOL"]:
+        currency = "USD"
+    initial_balance = 25000.0  # USD
+    db["users"][user.username] = {
+        "email": user.email,
+        "password_hash": hash_password(user.password),
+        "currency": currency,
+        "balance": initial_balance,
+        "status": "WARNING",
+        "department": "None",
+        "health_score": 85.0,
+        "avatar": "🧬",
+        "bio": "BioEmpire tizimiga yangi qo'shildim",
+        "registered_at": datetime.now().isoformat()
+    }
+    db["system_vault"]["active_users"] = len(db["users"])
+    save_db(db)
+    return {"status": "success", "username": user.username, "balance": initial_balance, "currency": currency}
 
 @app.post("/api/v2/auth/signin")
 async def signin(user: UserLogin):
-    async with db_lock:
-        if user.username not in db["users"]:
-            raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
-        target = db["users"][user.username]
-        if target["password_hash"] != hash_password(user.password):
-            raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
-        return {
-            "status": "success",
-            "username": user.username,
-            "balance": target["balance"],
-            "currency": target["currency"],
-            "status_layer": target["status"],
-            "department": target["department"],
-            "health_score": target["health_score"],
-            "avatar": target.get("avatar", "🧬"),
-            "bio": target.get("bio", "")
-        }
+    if user.username not in db["users"]:
+        raise HTTPException(400, "Noto'g'ri username yoki parol.")
+    target = db["users"][user.username]
+    if target["password_hash"] != hash_password(user.password):
+        raise HTTPException(400, "Noto'g'ri username yoki parol.")
+    return {
+        "status": "success",
+        "username": user.username,
+        "balance": target["balance"],
+        "currency": target["currency"],
+        "status_layer": target["status"],
+        "department": target["department"],
+        "health_score": target["health_score"],
+        "avatar": target.get("avatar", "🧬"),
+        "bio": target.get("bio", "")
+    }
 
-# Profile
 @app.get("/api/v2/profile/{username}")
 async def get_profile(username: str):
-    async with db_lock:
-        if username not in db["users"]:
-            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
-        return db["users"][username]
+    if username not in db["users"]:
+        raise HTTPException(404, "Foydalanuvchi topilmadi.")
+    return db["users"][username]
 
-# Social
 @app.get("/api/v2/social/posts")
 async def social_posts():
     return db["social_posts"]
 
 @app.post("/api/v2/social/post")
 async def create_post(req: SocialPostRequest):
-    async with db_lock:
-        if req.username not in db["users"]:
-            raise HTTPException(404, "Foydalanuvchi topilmadi.")
-        post = generate_social_post(req.username, req.content, False)
-        add_social_post(post)
-        track_user_activity(req.username, "social_post", {"content": req.content[:50]})
-        return post
+    if req.username not in db["users"]:
+        raise HTTPException(404, "Foydalanuvchi topilmadi.")
+    post = {
+        "id": generate_post_id(),
+        "username": req.username,
+        "content": req.content,
+        "timestamp": datetime.now().strftime("%H:%M:%S"),
+        "likes": 0,
+        "comments": []
+    }
+    db["social_posts"].insert(0, post)
+    save_db(db)
+    return post
 
 @app.post("/api/v2/social/like")
 async def like(req: LikeRequest):
-    async with db_lock:
-        for post in db["social_posts"]:
-            if post["id"] == req.post_id:
-                post["likes"] = post.get("likes", 0) + 1
-                save_db(db)
-                return {"success": True, "likes": post["likes"]}
-        raise HTTPException(404, "Post topilmadi.")
+    for post in db["social_posts"]:
+        if post["id"] == req.post_id:
+            post["likes"] = post.get("likes", 0) + 1
+            save_db(db)
+            return {"success": True, "likes": post["likes"]}
+    raise HTTPException(404, "Post topilmadi.")
 
 @app.post("/api/v2/social/comment")
 async def comment(req: CommentRequest):
-    async with db_lock:
-        for post in db["social_posts"]:
-            if post["id"] == req.post_id:
-                if "comments" not in post:
-                    post["comments"] = []
-                comment_obj = {
-                    "username": req.username,
-                    "text": req.comment,
-                    "timestamp": datetime.now().isoformat()
-                }
-                post["comments"].append(comment_obj)
-                save_db(db)
-                return {"success": True, "comment": comment_obj}
-        raise HTTPException(404, "Post topilmadi.")
+    for post in db["social_posts"]:
+        if post["id"] == req.post_id:
+            if "comments" not in post:
+                post["comments"] = []
+            post["comments"].append({
+                "username": req.username,
+                "text": req.comment,
+                "timestamp": datetime.now().isoformat()
+            })
+            save_db(db)
+            return {"success": True, "comment": post["comments"][-1]}
+    raise HTTPException(404, "Post topilmadi.")
 
-# AI Chat
 @app.post("/api/v2/ai/chat")
 async def ai_chat(req: AIChatRequest):
-    async with db_lock:
-        if req.username not in db["users"]:
-            raise HTTPException(404, "Foydalanuvchi topilmadi.")
-        user = db["users"][req.username]
-        currency = user["currency"]
-        rate = EXCHANGE_RATES[currency]
-        chat_price = CHAT_PRICE_USD * rate
-        if user["balance"] < chat_price:
-            return {"success": False, "message": f"⚠️ AI chat uchun ${chat_price:.2f} kerak."}
-        user["balance"] -= chat_price
-        db["system_vault"]["total_revenue"] += chat_price
-        track_user_activity(req.username, "ai_chat", {"message": req.message[:50]})
-        save_db(db)
+    if req.username not in db["users"]:
+        raise HTTPException(404, "Foydalanuvchi topilmadi.")
+    user = db["users"][req.username]
+    messages = [
+        {"role": "system", "content": "Siz BioEmpire AI shifokorisiz. Kasalliklar, davolanish va sog'liq haqida maslahat bering."},
+        {"role": "user", "content": req.message}
+    ]
+    ai_response = await call_ai_api(messages)
+    if not ai_response:
+        ai_response = "Kechirasiz, AI hozir javob bera olmadi. Iltimos, keyinroq urinib ko'ring."
+    return {"success": True, "response": ai_response}
 
-        messages = [
-            {"role": "system", "content": "Siz BioEmpire tizimining AI shifokorisiz. Sog'liq, davolanish va turli kasalliklar haqida batafsil ma'lumot berasiz."},
-            {"role": "user", "content": req.message}
-        ]
-        ai_response = await call_ai_api(messages)
-        if not ai_response:
-            ai_response = "Kechirasiz, AI hozir javob bera olmadi. Iltimos, keyinroq urinib ko'ring."
-
-        return {"success": True, "response": ai_response, "new_balance": user["balance"], "deducted": chat_price}
-
-# Camera
 @app.post("/api/v2/camera/analyze")
 async def camera_analyze(req: CameraAnalysisRequest):
-    async with db_lock:
-        if req.username not in db["users"]:
-            raise HTTPException(404, "Foydalanuvchi topilmadi.")
-        user = db["users"][req.username]
-        currency = user["currency"]
-        rate = EXCHANGE_RATES[currency]
-        analysis_price = CAMERA_PRICE_USD * rate
-        if user["balance"] < analysis_price:
-            return {"success": False, "message": f"⚠️ Kamera analizi uchun ${analysis_price:.2f} kerak."}
-        user["balance"] -= analysis_price
-        db["system_vault"]["total_revenue"] += analysis_price
-        save_db(db)
+    analysis = "Rasm tahlili: Hech narsa aniqlanmadi."
+    if req.image_data and GEMINI_AVAILABLE and GEMINI_API_KEY:
+        try:
+            image_bytes = base64.b64decode(req.image_data.split(",")[1])
+            model = genai.GenerativeModel(GEMINI_MODEL)
+            response = await asyncio.to_thread(
+                model.generate_content,
+                ["Ushbu rasmni tahlil qiling va diagnostik tavsiya bering.", {"mime_type": "image/jpeg", "data": image_bytes}]
+            )
+            if response and response.text:
+                analysis = response.text
+        except Exception as e:
+            analysis = f"Rasm tahlilida xatolik: {e}"
+    return {"success": True, "analysis": analysis}
 
-        analysis_result = ""
-        if req.image_data and GEMINI_AVAILABLE and GEMINI_API_KEY:
-            try:
-                image_bytes = base64.b64decode(req.image_data.split(",")[1] if "," in req.image_data else req.image_data)
-                model = genai.GenerativeModel(GEMINI_MODEL)
-                response = await asyncio.to_thread(
-                    model.generate_content,
-                    ["Ushbu rasmni tahlil qiling va diagnostik tavsiya bering.", {"mime_type": "image/jpeg", "data": image_bytes}]
-                )
-                analysis_result = response.text if response and response.text else "Rasm tahlili natija bermadi."
-            except Exception as e:
-                analysis_result = f"Rasm tahlilida xatolik: {e}"
-        else:
-            analysis_result = "Gemini Vision ishlamayapti yoki rasm yo'q."
-
-        if not analysis_result or "xatolik" in analysis_result.lower():
-            messages = [{"role": "system", "content": "Siz AI analistisisiz. Kamera orqali olingan ma'lumotlarni tahlil qiling."}, {"role": "user", "content": f"Rasm tahlili natijasi: {analysis_result}"}]
-            ai_response = await call_ai_api(messages)
-            if ai_response:
-                analysis_result = ai_response
-            else:
-                analysis_result = "🔬 Tahlil: Aniqlanmadi."
-
-        return {"success": True, "analysis": analysis_result, "new_balance": user["balance"], "deducted": analysis_price}
-
-# Health Ranking
 @app.get("/api/v2/health/ranking")
 async def health_ranking():
-    async with db_lock:
-        ranking = []
-        for username, user in db["users"].items():
-            ranking.append({
-                "username": username,
-                "health_score": user.get("health_score", 0),
-                "status": user.get("status", "WARNING"),
-                "avatar": user.get("avatar", "🧬")
-            })
-        ranking.sort(key=lambda x: x["health_score"], reverse=True)
-        return ranking
+    ranking = []
+    for username, user in db["users"].items():
+        ranking.append({
+            "username": username,
+            "health_score": user.get("health_score", 0),
+            "status": user.get("status", "WARNING"),
+            "avatar": user.get("avatar", "🧬")
+        })
+    ranking.sort(key=lambda x: x["health_score"], reverse=True)
+    return ranking
 
-# Stats
 @app.get("/api/v2/system/stats")
 async def system_stats():
     return {
@@ -1126,33 +774,23 @@ async def system_stats():
         "total_social_posts": len(db["social_posts"])
     }
 
-# Ads Performance
-@app.get("/api/v2/ai/ads-performance")
-async def ads_performance():
-    return db["ads_performance"]
-
-# Admin
 @app.post("/api/v2/admin/login")
 async def admin_login(request: Request):
     data = await request.json()
-    if data.get("username") == ADMIN_USERNAME and hash_password(data.get("password", "")) == ADMIN_PASSWORD_HASH:
+    if data.get("username") == "CEO" and hash_password(data.get("password", "")) == hash_password("12345678"):
         return {"success": True, "token": "admin-token"}
     raise HTTPException(401, "Noto'g'ri")
 
 @app.get("/api/v2/admin/dashboard")
 async def admin_dashboard(username: str = None, password: str = None):
-    if username != ADMIN_USERNAME or hash_password(password or "") != ADMIN_PASSWORD_HASH:
+    if username != "CEO" or hash_password(password or "") != hash_password("12345678"):
         raise HTTPException(401, "Avtorizatsiya kerak")
     return {
         "total_users": len(db["users"]),
         "total_revenue": db["system_vault"]["total_revenue"],
-        "active_users": db["system_vault"]["active_users"],
-        "total_sales": len(db.get("product_sales", []))
+        "active_users": db["system_vault"]["active_users"]
     }
 
-# ==========================================
-# SERVER
-# ==========================================
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5050))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
