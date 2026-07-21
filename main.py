@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 # ==========================================
-# GEMINI AI
+# GEMINI AI (eski kutubxona, lekin ishlaydi)
 # ==========================================
 try:
     import google.generativeai as genai
@@ -33,7 +33,7 @@ if os.path.exists(CONFIG_FILE):
         CONFIG = json.load(f)
 else:
     CONFIG = {
-        "exchange_rates": {"USD": 1.0},
+        "exchange_rates": {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075},
         "packages": {},
         "departments": [],
         "red_zone_departments": [],
@@ -43,15 +43,22 @@ else:
         "admin": {"username": "CEO", "password_hash": hashlib.sha256("12345678".encode()).hexdigest()}
     }
 
+EXCHANGE_RATES = CONFIG.get("exchange_rates", {"USD": 1.0})
+CHAT_PRICE_USD = CONFIG.get("chat_price_usd", 49)
+CAMERA_PRICE_USD = CONFIG.get("camera_analysis_price_usd", 150)
+ADMIN_USERNAME = CONFIG.get("admin", {}).get("username", "CEO")
+ADMIN_PASSWORD_HASH = CONFIG.get("admin", {}).get("password_hash", hashlib.sha256("12345678".encode()).hexdigest())
+
 # API kalitlari – muhit o‘zgaruvchilaridan olinadi
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-1.5-flash"
 
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     print("✅ Gemini API sozlandi")
 
-app = FastAPI(title="BioEmpire V9.4")
+app = FastAPI(title="BioEmpire V9.5")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -61,32 +68,193 @@ app.add_middleware(
 )
 
 # ==========================================
-# MA'LUMOTLAR BAZASI (fayl)
+# MA'LUMOTLAR BAZASI (JSON fayl)
 # ==========================================
 DB_FILE = "database_log.json"
+db_lock = asyncio.Lock()
 
 def load_db():
     if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f:
+        with open(DB_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    return {"users": {}, "feed": [], "social_posts": [], "system_vault": {"total_revenue": 0, "active_users": 0}, "notifications": [], "ai_logs": [], "ads_performance": {}}
+    return {
+        "users": {},
+        "feed": [],
+        "social_posts": [],
+        "system_vault": {"total_revenue": 0, "active_users": 0},
+        "notifications": [],
+        "user_activity": {},
+        "product_sales": [],
+        "ai_logs": [],
+        "ads_performance": {},
+        "comments": {},
+        "follows": {}
+    }
 
 def save_db(data):
-    with open(DB_FILE, "w") as f:
+    with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
 
 db = load_db()
 
 # ==========================================
+# YORDAMCHI FUNKSIYALAR
+# ==========================================
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def generate_post_id() -> str:
+    return f"post_{random.randint(10000, 99999)}_{int(datetime.now().timestamp())}"
+
+def generate_social_post(username: str, content: str, is_ai: bool = False) -> dict:
+    return {
+        "id": generate_post_id(),
+        "username": "🧬 BioEmpire_AI" if is_ai else username,
+        "content": content,
+        "timestamp": datetime.now().strftime("%H:%M:%S"),
+        "likes": random.randint(5, 50) if is_ai else 0,
+        "comments": [],
+        "is_ai": is_ai
+    }
+
+def generate_notification(username: str, message: str, type: str = "info") -> dict:
+    return {
+        "id": generate_post_id(),
+        "username": username,
+        "message": message,
+        "type": type,
+        "timestamp": datetime.now().isoformat(),
+        "read": False
+    }
+
+def add_social_post(post: dict):
+    db["social_posts"].insert(0, post)
+    if len(db["social_posts"]) > 100:
+        db["social_posts"].pop()
+    save_db(db)
+
+def add_notification(notification: dict):
+    db["notifications"].insert(0, notification)
+    if len(db["notifications"]) > 100:
+        db["notifications"].pop()
+    save_db(db)
+
+def track_user_activity(username: str, action: str, details: dict = None):
+    if username not in db["user_activity"]:
+        db["user_activity"][username] = {
+            "last_active": datetime.now().isoformat(),
+            "actions": [],
+            "total_spent": 0.0,
+            "packages_bought": 0
+        }
+    activity = db["user_activity"][username]
+    activity["last_active"] = datetime.now().isoformat()
+    activity["actions"].append({
+        "action": action,
+        "timestamp": datetime.now().isoformat(),
+        "details": details or {}
+    })
+    if len(activity["actions"]) > 100:
+        activity["actions"] = activity["actions"][-100:]
+    save_db(db)
+
+def ai_log(message: str, level: str = "INFO"):
+    db["ai_logs"].append({
+        "timestamp": datetime.now().isoformat(),
+        "level": level,
+        "message": message
+    })
+    if len(db["ai_logs"]) > 500:
+        db["ai_logs"] = db["ai_logs"][-500:]
+    save_db(db)
+
+# ==========================================
+# AI API CALLS
+# ==========================================
+async def call_groq_api(messages: List[dict]) -> Optional[str]:
+    if not GROQ_API_KEY:
+        return None
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    data = {
+        "model": "mixtral-8x7b-32768",
+        "messages": messages,
+        "temperature": 0.7,
+        "max_tokens": 2048
+    }
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, headers=headers, json=data)
+            if response.status_code == 200:
+                return response.json()["choices"][0]["message"]["content"]
+            return None
+    except:
+        return None
+
+async def call_gemini_api(messages: List[dict]) -> Optional[str]:
+    if not GEMINI_AVAILABLE or not GEMINI_API_KEY:
+        return None
+    try:
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        user_message = messages[-1]["content"] if messages else ""
+        context = "\n".join([m["content"] for m in messages if m["role"] == "system"])
+        full_prompt = f"{context}\n\nFoydalanuvchi: {user_message}" if context else user_message
+        response = await asyncio.to_thread(model.generate_content, full_prompt)
+        return response.text if response and response.text else None
+    except:
+        return None
+
+async def call_ai_api(messages: List[dict]) -> Optional[str]:
+    response = await call_gemini_api(messages)
+    if response:
+        return response
+    return await call_groq_api(messages)
+
+# ==========================================
+# PYDANTIC MODELLAR
+# ==========================================
+class UserRegister(BaseModel):
+    username: str = Field(..., min_length=2, max_length=30)
+    email: str
+    password: str = Field(..., min_length=6)
+    currency: str = "USD"
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class SocialPostRequest(BaseModel):
+    username: str
+    content: str
+
+class LikeRequest(BaseModel):
+    username: str
+    post_id: str
+
+class CommentRequest(BaseModel):
+    username: str
+    post_id: str
+    comment: str
+
+class AIChatRequest(BaseModel):
+    username: str
+    message: str
+    context: Optional[str] = None
+
+class CameraAnalysisRequest(BaseModel):
+    username: str
+    department_id: int
+    image_data: Optional[str] = None
+
+# ==========================================
 # HTML (to‘liq interfeys)
 # ==========================================
-HTML = """
-<!DOCTYPE html>
+HTML = """<!DOCTYPE html>
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧬 BioEmpire V9.4</title>
+    <title>🧬 BioEmpire V9.5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #E8F5E9; font-family: 'Segoe UI', system-ui, sans-serif; }
@@ -140,6 +308,11 @@ HTML = """
         .avatar-lg { width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, #C8E6C9, #66BB6A); display: flex; align-items: center; justify-content: center; font-size: 28px; border: 2px solid #FFB300; flex-shrink: 0; }
         @media (max-width:1024px) { .sidebar { width: 70px !important; padding: 10px 6px; } .sidebar .btn-text { display: none; } .sidebar .icon { font-size: 24px; width: 100%; text-align: center; } }
         @media (max-width:768px) { .sidebar { display: none; } }
+        .status-badge { display: inline-block; padding: 2px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .status-warning { background: #FFB300; color: #1B3A1B; }
+        .status-red { background: #E53935; color: white; }
+        .status-optimized { background: #66BB6A; color: white; }
+        .status-immortal { background: #FFB300; color: #1B3A1B; }
     </style>
 </head>
 <body>
@@ -439,6 +612,7 @@ async function loadProfile() {
         document.getElementById('sidebar-avatar').innerText = data.avatar || '🧬';
 
         const container = document.getElementById('profile-content');
+        const statusClass = data.status === 'WARNING' ? 'status-warning' : data.status === 'RED_ZONE' ? 'status-red' : data.status === 'OPTIMIZED' ? 'status-optimized' : 'status-immortal';
         container.innerHTML = `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]">
@@ -447,7 +621,7 @@ async function loadProfile() {
                         <div><div class="text-xl font-bold">${currentUser}</div><div class="text-sm text-gray-500">${data.email}</div></div>
                     </div>
                     <div class="mt-4 space-y-1 text-sm">
-                        <p><span class="text-gray-500">Holat:</span> <span class="badge-status badge-warning">${data.status}</span></p>
+                        <p><span class="text-gray-500">Holat:</span> <span class="status-badge ${statusClass}">${data.status}</span></p>
                         <p><span class="text-gray-500">Balans:</span> <strong class="text-[#43A047]">${data.balance.toFixed(2)} ${data.currency}</strong></p>
                         <p><span class="text-gray-500">Salomatlik:</span> <strong class="text-[#43A047]">${data.health_score.toFixed(1)}%</strong></p>
                         <p><span class="text-gray-500">Bio:</span> ${data.bio || 'Yo\'q'}</p>
@@ -494,13 +668,15 @@ async function createSocialPost() {
     const input = document.getElementById('social-input');
     if (!input.value.trim() || !currentUser) return;
     try {
-        await fetch('/api/v2/social/post', {
+        const res = await fetch('/api/v2/social/post', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: currentUser, content: input.value })
         });
-        input.value = '';
-        loadSocialFeed();
+        if (res.ok) {
+            input.value = '';
+            loadSocialFeed();
+        }
     } catch (e) { alert('Xatolik: ' + e.message); }
 }
 
@@ -561,7 +737,7 @@ async function sendConsult() {
     box.scrollTop = box.scrollHeight;
 }
 
-// Enter tugmasi
+// Enter
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && document.activeElement?.id === 'consult-input') sendConsult();
     if (e.key === 'Enter' && document.activeElement?.id === 'social-input') createSocialPost();
@@ -741,112 +917,242 @@ async function adminLoadDashboard() {
         document.getElementById('admin-data').innerHTML = `<pre class="text-xs">${JSON.stringify(data, null, 2)}</pre>`;
     } catch (e) {}
 }
-
-// ============================================================
-// INIT
-// ============================================================
-window.onload = function() {
-    // Hech narsa
-};
 </script>
 </body>
-</html>
-"""
+</html>"""
 
-# ============================================================
+# ==========================================
 # ENDPOINTLAR
-# ============================================================
+# ==========================================
 @app.get("/", response_class=HTMLResponse)
 @app.head("/", response_class=HTMLResponse)
 async def root():
     return HTML
 
-# Auth
+# AUTH
 @app.post("/api/v2/auth/signup")
 async def signup(user: UserRegister):
-    # Qisqa – to‘liq versiyada batafsil
-    return {"status": "success", "username": user.username, "balance": 25000, "currency": "USD"}
+    async with db_lock:
+        if user.username in db["users"]:
+            raise HTTPException(status_code=400, detail="Bu username allaqachon band.")
+        curr = user.currency.upper()
+        if curr not in EXCHANGE_RATES:
+            curr = "USD"
+        initial_balance = 25000.0 * EXCHANGE_RATES[curr]
+        db["users"][user.username] = {
+            "email": user.email,
+            "password_hash": hash_password(user.password),
+            "currency": curr,
+            "balance": initial_balance,
+            "status": "WARNING",
+            "department": "None",
+            "health_score": 85.0,
+            "last_purchase": None,
+            "packages": [],
+            "avatar": "🧬",
+            "bio": "BioEmpire tizimiga yangi qo'shildim",
+            "full_name": "",
+            "age": None,
+            "gender": "",
+            "phone": "",
+            "address": "",
+            "social_links": {},
+            "registered_at": datetime.now().isoformat()
+        }
+        db["system_vault"]["active_users"] = len(db["users"])
+        save_db(db)
+        return {"status": "success", "username": user.username, "balance": initial_balance, "currency": curr}
 
 @app.post("/api/v2/auth/signin")
 async def signin(user: UserLogin):
-    return {"status": "success", "username": user.username, "balance": 25000, "currency": "USD", "status_layer": "WARNING", "health_score": 85}
+    async with db_lock:
+        if user.username not in db["users"]:
+            raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
+        target = db["users"][user.username]
+        if target["password_hash"] != hash_password(user.password):
+            raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
+        return {
+            "status": "success",
+            "username": user.username,
+            "balance": target["balance"],
+            "currency": target["currency"],
+            "status_layer": target["status"],
+            "department": target["department"],
+            "health_score": target["health_score"],
+            "avatar": target.get("avatar", "🧬"),
+            "bio": target.get("bio", "")
+        }
 
 # Profile
 @app.get("/api/v2/profile/{username}")
 async def get_profile(username: str):
-    return {"username": username, "email": "test@test.com", "balance": 25000, "currency": "USD", "status": "WARNING", "health_score": 85, "avatar": "🧬", "bio": "BioEmpire foydalanuvchisi"}
+    async with db_lock:
+        if username not in db["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        return db["users"][username]
 
 # Social
 @app.get("/api/v2/social/posts")
 async def social_posts():
-    return [{"id": "1", "username": "test", "content": "Salom hammaga!", "timestamp": "12:00", "likes": 5, "comments": []}]
+    return db["social_posts"]
 
 @app.post("/api/v2/social/post")
 async def create_post(req: SocialPostRequest):
-    return {"id": "2", "username": req.username, "content": req.content, "timestamp": "12:05", "likes": 0, "comments": []}
+    async with db_lock:
+        if req.username not in db["users"]:
+            raise HTTPException(404, "Foydalanuvchi topilmadi.")
+        post = generate_social_post(req.username, req.content, False)
+        add_social_post(post)
+        track_user_activity(req.username, "social_post", {"content": req.content[:50]})
+        return post
 
 @app.post("/api/v2/social/like")
 async def like(req: LikeRequest):
-    return {"success": True, "likes": 1}
+    async with db_lock:
+        for post in db["social_posts"]:
+            if post["id"] == req.post_id:
+                post["likes"] = post.get("likes", 0) + 1
+                save_db(db)
+                return {"success": True, "likes": post["likes"]}
+        raise HTTPException(404, "Post topilmadi.")
 
 @app.post("/api/v2/social/comment")
 async def comment(req: CommentRequest):
-    return {"success": True, "comment": {"username": req.username, "text": req.comment}}
+    async with db_lock:
+        for post in db["social_posts"]:
+            if post["id"] == req.post_id:
+                if "comments" not in post:
+                    post["comments"] = []
+                comment_obj = {
+                    "username": req.username,
+                    "text": req.comment,
+                    "timestamp": datetime.now().isoformat()
+                }
+                post["comments"].append(comment_obj)
+                save_db(db)
+                return {"success": True, "comment": comment_obj}
+        raise HTTPException(404, "Post topilmadi.")
 
 # AI Chat
 @app.post("/api/v2/ai/chat")
 async def ai_chat(req: AIChatRequest):
-    # Haqiqiy AI chaqiruvi
-    try:
-        if GEMINI_AVAILABLE and GEMINI_API_KEY:
-            model = genai.GenerativeModel(GEMINI_MODEL)
-            response = await asyncio.to_thread(model.generate_content, req.message)
-            ai_response = response.text if response else "Javob yo'q"
-        else:
-            # Simulyatsiya
-            ai_response = f"🧬 [AI ANALYST]: Sizning simptomlaringiz virusli infeksiyaga o'xshaydi. 3 kun davomida dam oling va ko'p suv iching."
-    except:
-        ai_response = "AI hozircha ishlamayapti, lekin tez orada ishlaydi."
-    return {"success": True, "response": ai_response, "new_balance": 24900, "deducted": 49}
+    async with db_lock:
+        if req.username not in db["users"]:
+            raise HTTPException(404, "Foydalanuvchi topilmadi.")
+        user = db["users"][req.username]
+        currency = user["currency"]
+        rate = EXCHANGE_RATES[currency]
+        chat_price = CHAT_PRICE_USD * rate
+        if user["balance"] < chat_price:
+            return {"success": False, "message": f"⚠️ AI chat uchun ${chat_price:.2f} kerak."}
+        user["balance"] -= chat_price
+        db["system_vault"]["total_revenue"] += chat_price
+        track_user_activity(req.username, "ai_chat", {"message": req.message[:50]})
+        save_db(db)
+
+        messages = [
+            {"role": "system", "content": "Siz BioEmpire tizimining AI shifokorisiz. Sog'liq, davolanish va turli kasalliklar haqida batafsil ma'lumot berasiz."},
+            {"role": "user", "content": req.message}
+        ]
+        ai_response = await call_ai_api(messages)
+        if not ai_response:
+            ai_response = "Kechirasiz, AI hozir javob bera olmadi. Iltimos, keyinroq urinib ko'ring."
+
+        return {"success": True, "response": ai_response, "new_balance": user["balance"], "deducted": chat_price}
 
 # Camera
 @app.post("/api/v2/camera/analyze")
 async def camera_analyze(req: CameraAnalysisRequest):
-    # Gemini Vision simulyatsiyasi
-    return {"success": True, "analysis": "🔬 Rasm tahlili: Teri toshmasi aniqlangan. Dermatologga murojaat qiling.", "new_balance": 24850, "deducted": 150}
+    async with db_lock:
+        if req.username not in db["users"]:
+            raise HTTPException(404, "Foydalanuvchi topilmadi.")
+        user = db["users"][req.username]
+        currency = user["currency"]
+        rate = EXCHANGE_RATES[currency]
+        analysis_price = CAMERA_PRICE_USD * rate
+        if user["balance"] < analysis_price:
+            return {"success": False, "message": f"⚠️ Kamera analizi uchun ${analysis_price:.2f} kerak."}
+        user["balance"] -= analysis_price
+        db["system_vault"]["total_revenue"] += analysis_price
+        save_db(db)
+
+        analysis_result = ""
+        if req.image_data and GEMINI_AVAILABLE and GEMINI_API_KEY:
+            try:
+                image_bytes = base64.b64decode(req.image_data.split(",")[1] if "," in req.image_data else req.image_data)
+                model = genai.GenerativeModel(GEMINI_MODEL)
+                response = await asyncio.to_thread(
+                    model.generate_content,
+                    ["Ushbu rasmni tahlil qiling va diagnostik tavsiya bering.", {"mime_type": "image/jpeg", "data": image_bytes}]
+                )
+                analysis_result = response.text if response and response.text else "Rasm tahlili natija bermadi."
+            except Exception as e:
+                analysis_result = f"Rasm tahlilida xatolik: {e}"
+        else:
+            analysis_result = "Gemini Vision ishlamayapti yoki rasm yo'q."
+
+        if not analysis_result or "xatolik" in analysis_result.lower():
+            messages = [{"role": "system", "content": "Siz AI analistisisiz. Kamera orqali olingan ma'lumotlarni tahlil qiling."}, {"role": "user", "content": f"Rasm tahlili natijasi: {analysis_result}"}]
+            ai_response = await call_ai_api(messages)
+            if ai_response:
+                analysis_result = ai_response
+            else:
+                analysis_result = "🔬 Tahlil: Aniqlanmadi."
+
+        return {"success": True, "analysis": analysis_result, "new_balance": user["balance"], "deducted": analysis_price}
 
 # Health Ranking
 @app.get("/api/v2/health/ranking")
 async def health_ranking():
-    return [{"username": "test", "health_score": 85, "status": "WARNING", "avatar": "🧬"}]
+    async with db_lock:
+        ranking = []
+        for username, user in db["users"].items():
+            ranking.append({
+                "username": username,
+                "health_score": user.get("health_score", 0),
+                "status": user.get("status", "WARNING"),
+                "avatar": user.get("avatar", "🧬")
+            })
+        ranking.sort(key=lambda x: x["health_score"], reverse=True)
+        return ranking
 
 # Stats
 @app.get("/api/v2/system/stats")
 async def system_stats():
-    return {"total_revenue": 1000, "active_users": 5, "total_sales": 2, "total_social_posts": 3}
+    return {
+        "total_revenue": db["system_vault"]["total_revenue"],
+        "active_users": db["system_vault"]["active_users"],
+        "total_sales": len(db.get("product_sales", [])),
+        "total_social_posts": len(db["social_posts"])
+    }
 
 # Ads Performance
 @app.get("/api/v2/ai/ads-performance")
 async def ads_performance():
-    return {}
+    return db["ads_performance"]
 
 # Admin
 @app.post("/api/v2/admin/login")
 async def admin_login(request: Request):
     data = await request.json()
-    if data.get("username") == "CEO" and data.get("password") == "12345678":
+    if data.get("username") == ADMIN_USERNAME and hash_password(data.get("password", "")) == ADMIN_PASSWORD_HASH:
         return {"success": True, "token": "admin-token"}
     raise HTTPException(401, "Noto'g'ri")
 
 @app.get("/api/v2/admin/dashboard")
 async def admin_dashboard(username: str = None, password: str = None):
-    if username == "CEO" and password == "12345678":
-        return {"total_users": 5, "total_revenue": 1000, "active_users": 3}
-    raise HTTPException(401, "Avtorizatsiya kerak")
+    if username != ADMIN_USERNAME or hash_password(password or "") != ADMIN_PASSWORD_HASH:
+        raise HTTPException(401, "Avtorizatsiya kerak")
+    return {
+        "total_users": len(db["users"]),
+        "total_revenue": db["system_vault"]["total_revenue"],
+        "active_users": db["system_vault"]["active_users"],
+        "total_sales": len(db.get("product_sales", []))
+    }
 
-# ============================================================
+# ==========================================
 # SERVER
-# ============================================================
+# ==========================================
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5050))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
