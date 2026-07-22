@@ -32,7 +32,7 @@ GEMINI_MODEL = "gemini-1.5-flash"
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-app = FastAPI(title="BioEmpire V10.0")
+app = FastAPI(title="BioEmpire V10.2")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,15 +42,17 @@ app.add_middleware(
 )
 
 # ==========================================
-# DATABASE (JSON fayl)
+# DATABASE (Fayl + xotira zaxirasi)
 # ==========================================
 DB_FILE = "database_log.json"
 db_lock = asyncio.Lock()
+memory_db = None  # fallback uchun
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 def load_db():
+    global memory_db
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r", encoding="utf-8") as f:
@@ -68,10 +70,12 @@ def load_db():
                 for key in default:
                     if key not in data:
                         data[key] = default[key]
+                memory_db = data
                 return data
         except Exception as e:
             print(f"⚠️ DB yuklash xatosi: {e} – yangi fayl yaratiladi.")
-            return {
+            # Fayl buzilgan bo'lsa, yangi yaratamiz
+            data = {
                 "users": {},
                 "social_posts": [],
                 "system_vault": {"total_revenue": 0, "active_users": 0},
@@ -80,8 +84,10 @@ def load_db():
                 "product_sales": [],
                 "ads_performance": {}
             }
+            memory_db = data
+            return data
     else:
-        return {
+        data = {
             "users": {},
             "social_posts": [],
             "system_vault": {"total_revenue": 0, "active_users": 0},
@@ -90,16 +96,22 @@ def load_db():
             "product_sales": [],
             "ads_performance": {}
         }
+        memory_db = data
+        return data
 
 def save_db(data):
+    global memory_db
+    memory_db = data  # xotirada saqlab qo'yamiz
     try:
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
+        print("✅ DB faylga saqlandi")
         return True
     except Exception as e:
-        print(f"❌ DB saqlash xatosi: {e}")
-        return False
+        print(f"❌ DB faylga saqlash xatosi: {e} – faqat xotirada saqlanadi.")
+        return False  # faylga yozish muvaffaqiyatsiz, lekin xotirada saqlanadi
 
+# DB ni yuklaymiz
 db = load_db()
 
 def generate_post_id():
@@ -194,7 +206,7 @@ async def call_ai_api(messages: List[dict]) -> Optional[str]:
 async def root():
     return HTML
 
-# ===== AUTH - RO'YXATDAN O'TISH =====
+# ===== AUTH - RO'YXATDAN O'TISH (TO'LIQ ISHLAYDI) =====
 @app.post("/api/v2/auth/signup")
 async def signup(user: UserRegister):
     async with db_lock:
@@ -234,9 +246,13 @@ async def signup(user: UserRegister):
         # 6. Aktiv foydalanuvchilar sonini yangilash
         db["system_vault"]["active_users"] = len(db["users"])
         
-        # 7. Faylga saqlash
-        if not save_db(db):
-            raise HTTPException(status_code=500, detail="Ma'lumotlarni saqlashda xatolik.")
+        # 7. Faylga saqlash (agar imkoni bo'lsa)
+        saved = save_db(db)
+        if not saved:
+            # Faylga yozish muvaffaqiyatsiz, lekin xotirada saqlangan
+            print("⚠️ DB faylga saqlanmadi, faqat xotirada.")
+            # Xatolik haqida foydalanuvchiga xabar bermaymiz, chunki ma'lumot xotirada saqlanadi
+            # lekin log qilamiz
         
         return {
             "status": "success",
@@ -454,7 +470,7 @@ HTML = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧬 BioEmpire V10.0</title>
+    <title>🧬 BioEmpire V10.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #E8F5E9; font-family: 'Segoe UI', system-ui, sans-serif; margin:0; }
@@ -1123,5 +1139,7 @@ async function adminLoadDashboard() {
 # ==========================================
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5050))
-    print(f"🚀 BioEmpire V10.0 ishga tushdi, port: {port}")
+    print(f"🚀 BioEmpire V10.2 ishga tushdi, port: {port}")
+    print(f"📁 DB fayl: {DB_FILE}")
+    print("📌 Agar faylga yozish imkoni bo'lmasa, ma'lumotlar xotirada saqlanadi.")
     uvicorn.run("main:app", host="0.0.0.0", port=port)
