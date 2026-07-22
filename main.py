@@ -3,36 +3,81 @@ import json
 import random
 import asyncio
 import hashlib
-import base64
 import httpx
-from datetime import datetime
-from typing import Optional, List
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 # ==========================================
-# GEMINI AI (ixtiyoriy)
+# GEMINI AI
 # ==========================================
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
+    print("⚠️ Google Generative AI o‘rnatilmagan.")
 
 # ==========================================
-# KONFIGURATSIYA
+# KONFIGURATSIYANI YUKLASH
 # ==========================================
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = "gemini-1.5-flash"
+CONFIG_FILE = "config.json"
+if os.path.exists(CONFIG_FILE):
+    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+        CONFIG = json.load(f)
+else:
+    print("❌ config.json topilmadi!")
+    exit(1)
+
+UI_CONFIG = CONFIG["ui"]
+EXCHANGE_RATES = CONFIG["exchange_rates"]
+PACKAGES = CONFIG["packages"]
+DEPARTMENTS = {d["id"]: d for d in CONFIG["departments"]}
+RED_ZONE_DEPARTMENTS = {d["id"]: d for d in CONFIG["red_zone_departments"]}
+ECOMMERCE = CONFIG["ecommerce"]
+CHAT_PRICE_USD = CONFIG["chat_price_usd"]
+CAMERA_PRICE_USD = CONFIG["camera_analysis_price_usd"]
+API_CONFIG = CONFIG.get("api", {})
+GROQ_API_KEY = API_CONFIG.get("groq_api_key", "")
+GEMINI_API_KEY = API_CONFIG.get("gemini_api_key", "")
+PRIMARY_AI = API_CONFIG.get("primary_ai", "groq")
+FALLBACK_AI = API_CONFIG.get("fallback_ai", "gemini")
+GROQ_MODEL = API_CONFIG.get("groq_model", "mixtral-8x7b-32768")
+GEMINI_MODEL = API_CONFIG.get("gemini_model", "gemini-1.5-flash")
+GROQ_TEMPERATURE = API_CONFIG.get("temperature", 0.7)
+GROQ_MAX_TOKENS = API_CONFIG.get("max_tokens", 2048)
+AUTO_LEARNING_INTERVAL = CONFIG.get("auto_learning_interval", 180)
+AUTO_MARKETING_INTERVAL = CONFIG.get("auto_marketing_interval", 300)
+AUTO_ADS_OPTIMIZER_INTERVAL = CONFIG.get("auto_ads_optimizer_interval", 600)
+AUTO_DECISION_INTERVAL = CONFIG.get("auto_decision_interval", 900)
+MAX_AI_HISTORY = CONFIG.get("max_ai_history", 50)
+AI_AUTONOMY = CONFIG.get("ai_autonomy", {
+    "enabled": True,
+    "max_price_change_percent": 30,
+    "min_profit_margin": 10,
+    "max_campaigns": 8,
+    "self_learning_enabled": True,
+    "auto_restock_enabled": True,
+    "decision_threshold": 0.7,
+    "ads_budget": 10000,
+    "min_campaign_performance": 0.05,
+    "ab_test_duration": 2
+})
 
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-app = FastAPI(title="BioEmpire V9.8")
+# ==========================================
+# MA'LUMOTLAR BAZASI
+# ==========================================
+DB_FILE = "database_log.json"
+BACKUP_FILE = "database_log_backup.json"
+
+app = FastAPI(title="BioEmpire V9", version="9.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,84 +85,89 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ==========================================
-# DATABASE
-# ==========================================
-DB_FILE = "database_log.json"
 db_lock = asyncio.Lock()
+ai_chat_history = {}
 
-def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def load_db():
+# ==========================================
+# MA'LUMOTLARNI YUKLASH / SAQLASH
+# ==========================================
+def load_initial_state() -> dict:
+    default_state = {
+        "users": {},
+        "feed": [],
+        "social_posts": [],
+        "system_vault": {"total_revenue": 0.0, "active_users": 0},
+        "likes": {},
+        "health_rankings": {},
+        "notifications": [],
+        "user_activity": {},
+        "tournaments": [],
+        "crypto_wallets": {},
+        "product_sales": [],
+        "ai_decisions": [],
+        "ai_insights": [],
+        "ai_strategies": [],
+        "marketing_campaigns": [],
+        "price_history": {},
+        "product_performance": {},
+        "ai_logs": [],
+        "ai_self_improvements": [],
+        "ads_performance": {}  # Reklama samaradorligi
+    }
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            pass
-    return {
-        "users": {},
-        "social_posts": [],
-        "system_vault": {"total_revenue": 0, "active_users": 0},
-        "notifications": [],
-        "user_activity": {},
-        "product_sales": [],
-        "ads_performance": {}
-    }
+                data = json.load(f)
+                for key in default_state:
+                    if key not in data:
+                        data[key] = default_state[key]
+                return data
+        except Exception:
+            return default_state
+    return default_state
 
-def save_db(data):
+db_state = load_initial_state()
+
+def sync_save_to_disk():
     try:
         with open(DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
+            json.dump(db_state, f, indent=4, ensure_ascii=False)
+        with open(BACKUP_FILE, "w", encoding="utf-8") as f:
+            json.dump(db_state, f, indent=4, ensure_ascii=False)
         return True
     except Exception as e:
-        print(f"[DB] Saqlash xatosi: {e}")
+        print(f"[ERROR] Diskka yozishda xatolik: {e}")
         return False
 
-db = load_db()
-
-def generate_post_id():
-    return f"post_{random.randint(10000, 99999)}_{int(datetime.now().timestamp())}"
+async def save_state():
+    await asyncio.to_thread(sync_save_to_disk)
 
 # ==========================================
-# PYDANTIC MODELLAR
+# WEBSOCKET MANAGER
 # ==========================================
-class UserRegister(BaseModel):
-    username: str = Field(..., min_length=2, max_length=30)
-    email: str
-    password: str = Field(..., min_length=6)
-    currency: str = "USD"
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
 
-class UserLogin(BaseModel):
-    username: str
-    password: str
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
 
-class SocialPostRequest(BaseModel):
-    username: str
-    content: str
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
 
-class LikeRequest(BaseModel):
-    username: str
-    post_id: str
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception:
+                pass
 
-class CommentRequest(BaseModel):
-    username: str
-    post_id: str
-    comment: str
-
-class AIChatRequest(BaseModel):
-    username: str
-    message: str
-
-class CameraAnalysisRequest(BaseModel):
-    username: str
-    department_id: int
-    image_data: Optional[str] = None
+manager = ConnectionManager()
 
 # ==========================================
-# AI CALLS (GROQ + GEMINI)
+# AI API CALLS
 # ==========================================
 async def call_groq_api(messages: List[dict]) -> Optional[str]:
     if not GROQ_API_KEY:
@@ -125,18 +175,22 @@ async def call_groq_api(messages: List[dict]) -> Optional[str]:
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     data = {
-        "model": "mixtral-8x7b-32768",
+        "model": GROQ_MODEL,
         "messages": messages,
-        "temperature": 0.7,
-        "max_tokens": 2048
+        "temperature": GROQ_TEMPERATURE,
+        "max_tokens": GROQ_MAX_TOKENS
     }
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(url, headers=headers, json=data)
             if response.status_code == 200:
-                return response.json()["choices"][0]["message"]["content"]
-            return None
-    except:
+                result = response.json()
+                return result["choices"][0]["message"]["content"]
+            else:
+                print(f"[Groq API] Xatolik: {response.status_code}")
+                return None
+    except Exception as e:
+        print(f"[Groq API] Xatolik: {e}")
         return None
 
 async def call_gemini_api(messages: List[dict]) -> Optional[str]:
@@ -148,45 +202,636 @@ async def call_gemini_api(messages: List[dict]) -> Optional[str]:
         context = "\n".join([m["content"] for m in messages if m["role"] == "system"])
         full_prompt = f"{context}\n\nFoydalanuvchi: {user_message}" if context else user_message
         response = await asyncio.to_thread(model.generate_content, full_prompt)
-        return response.text if response and response.text else None
-    except:
+        return response.text
+    except Exception as e:
+        print(f"[Gemini API] Xatolik: {e}")
         return None
 
 async def call_ai_api(messages: List[dict]) -> Optional[str]:
-    response = await call_gemini_api(messages)
-    if response:
-        return response
-    return await call_groq_api(messages)
+    if PRIMARY_AI == "gemini":
+        response = await call_gemini_api(messages)
+        if response:
+            return response
+        return await call_groq_api(messages)
+    else:
+        response = await call_groq_api(messages)
+        if response:
+            return response
+        return await call_gemini_api(messages)
 
 # ==========================================
-# ENDPOINTLAR
+# PYDANTIC MODELLAR (qisqa)
 # ==========================================
+class UserRegister(BaseModel):
+    username: str = Field(..., min_length=2, max_length=30)
+    email: str
+    password: str = Field(..., min_length=6)
+    currency: str = "USD"
 
-# ===== ROOT =====
-@app.get("/", response_class=HTMLResponse)
-@app.head("/", response_class=HTMLResponse)
-async def root():
-    return HTML
+class UserLogin(BaseModel):
+    username: str
+    password: str
 
-# ===== AUTH - RO'YXATDAN O'TISH =====
+class PainInput(BaseModel):
+    username: str
+    department_id: int
+    text: str
+
+class PurchaseRequest(BaseModel):
+    username: str
+    package_type: str
+
+class ChatRequest(BaseModel):
+    username: str
+    message: str
+
+class CameraAnalysisRequest(BaseModel):
+    username: str
+    department_id: int
+    image_data: Optional[str] = None
+
+class SocialPostRequest(BaseModel):
+    username: str
+    content: str
+
+class LikeRequest(BaseModel):
+    username: str
+    post_id: str
+
+class TournamentJoin(BaseModel):
+    username: str
+    tournament_id: str
+
+class TournamentScore(BaseModel):
+    username: str
+    tournament_id: str
+    score: float
+
+class CryptoConnect(BaseModel):
+    username: str
+    wallet_address: str
+
+class CryptoPay(BaseModel):
+    username: str
+    amount: float
+    currency: str = "USD"
+
+class EmailReport(BaseModel):
+    username: str
+    email: str
+
+class VirtualDoctorRequest(BaseModel):
+    username: str
+    symptoms: str
+
+class ProductOrderRequest(BaseModel):
+    username: str
+    product_id: str
+    quantity: int = 1
+
+class AIChatRequest(BaseModel):
+    username: str
+    message: str
+    context: Optional[str] = None
+
+class AIRecommendationRequest(BaseModel):
+    username: str
+    context: str
+
+# ==========================================
+# YORDAMCHI FUNKSIYALAR
+# ==========================================
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def generate_post_id() -> str:
+    return f"post_{random.randint(10000, 99999)}_{int(datetime.now().timestamp())}"
+
+def generate_feed_post(username: str, department_name: str, text: str) -> dict:
+    return {
+        "id": generate_post_id(),
+        "username": username,
+        "text": text,
+        "timestamp": datetime.now().strftime("%H:%M:%S"),
+        "likes": 0,
+        "type": "feed"
+    }
+
+def generate_social_post(username: str, content: str, is_ai: bool = False) -> dict:
+    return {
+        "id": generate_post_id(),
+        "username": "🧬 BioEmpire_AI" if is_ai else username,
+        "content": content,
+        "timestamp": datetime.now().strftime("%H:%M:%S"),
+        "likes": random.randint(5, 50) if is_ai else 0,
+        "comments": [],
+        "is_ai": is_ai
+    }
+
+def generate_notification(username: str, message: str, type: str = "info") -> dict:
+    return {
+        "id": generate_post_id(),
+        "username": username,
+        "message": message,
+        "type": type,
+        "timestamp": datetime.now().isoformat(),
+        "read": False
+    }
+
+def add_to_feed(post: dict):
+    db_state["feed"].insert(0, post)
+    if len(db_state["feed"]) > 50:
+        db_state["feed"].pop()
+
+def add_social_post(post: dict):
+    db_state["social_posts"].insert(0, post)
+    if len(db_state["social_posts"]) > 100:
+        db_state["social_posts"].pop()
+
+def add_notification(notification: dict):
+    db_state["notifications"].insert(0, notification)
+    if len(db_state["notifications"]) > 100:
+        db_state["notifications"].pop()
+
+def track_user_activity(username: str, action: str, details: dict = None):
+    if username not in db_state["user_activity"]:
+        db_state["user_activity"][username] = {
+            "last_active": datetime.now().isoformat(),
+            "actions": [],
+            "total_spent": 0.0,
+            "packages_bought": 0
+        }
+    activity = db_state["user_activity"][username]
+    activity["last_active"] = datetime.now().isoformat()
+    activity["actions"].append({
+        "action": action,
+        "timestamp": datetime.now().isoformat(),
+        "details": details or {}
+    })
+    if len(activity["actions"]) > 100:
+        activity["actions"] = activity["actions"][-100:]
+
+def ai_log(message: str, level: str = "INFO"):
+    db_state["ai_logs"].append({
+        "timestamp": datetime.now().isoformat(),
+        "level": level,
+        "message": message
+    })
+    if len(db_state["ai_logs"]) > 500:
+        db_state["ai_logs"] = db_state["ai_logs"][-500:]
+
+# ==========================================
+# 1. AVTONOM AI – SELF-LEARNING
+# ==========================================
+async def ai_self_learning_task():
+    while True:
+        await asyncio.sleep(AUTO_LEARNING_INTERVAL)
+        async with db_lock:
+            if not db_state["users"] or not AI_AUTONOMY.get("self_learning_enabled", True):
+                continue
+            ai_log("🧠 AI o'z-o'zini o'rganish bosqichi boshlandi", "INFO")
+            try:
+                total_users = len(db_state["users"])
+                total_sales = len(db_state["product_sales"])
+                total_revenue = db_state["system_vault"]["total_revenue"]
+                avg_health = sum(u.get("health_score", 0) for u in db_state["users"].values()) / max(1, total_users)
+                active_users = len([u for u in db_state["user_activity"].values() 
+                                  if u.get("last_active", "").startswith(datetime.now().date().isoformat())])
+
+                insights = []
+                if total_sales < 10:
+                    insights.append("Sotuvlar juda past. Marketingni kuchaytirish kerak.")
+                if total_users < 5:
+                    insights.append("Foydalanuvchilar soni kam. Ro'yxatdan o'tishni rag'batlantirish kerak.")
+                if avg_health < 70:
+                    insights.append("Foydalanuvchilar salomatligi o'rtacha past.")
+                if active_users < total_users * 0.3:
+                    insights.append("Foydalanuvchilarning 70% dan ko'pi faol emas.")
+
+                strategy = {
+                    "timestamp": datetime.now().isoformat(),
+                    "insights": insights,
+                    "recommendations": [],
+                    "total_revenue": total_revenue,
+                    "active_users_ratio": active_users / max(1, total_users)
+                }
+                if total_sales < 10:
+                    strategy["recommendations"].append("Chegirma kampaniyasini boshlang")
+                if total_users < 5:
+                    strategy["recommendations"].append("Referral bonus dasturini joriy qiling")
+                if avg_health < 70:
+                    strategy["recommendations"].append("1-Haftalik paketni bepul sinov sifatida taklif qiling")
+                if active_users < total_users * 0.3:
+                    strategy["recommendations"].append("Eski foydalanuvchilarga maxsus taklif yuboring")
+
+                db_state["ai_insights"].append({"type": "self_learning", "data": strategy})
+                if len(db_state["ai_insights"]) > 100:
+                    db_state["ai_insights"] = db_state["ai_insights"][-100:]
+                ai_log(f"✅ O'z-o'zini o'rganish yakunlandi", "INFO")
+                await save_state()
+            except Exception as e:
+                ai_log(f"❌ O'z-o'zini o'rganishda xatolik: {e}", "ERROR")
+
+# ==========================================
+# 2. AVTONOM AI – MARKETING VA ADS YARATISH
+# ==========================================
+async def ai_autonomous_marketing_task():
+    while True:
+        await asyncio.sleep(AUTO_MARKETING_INTERVAL)
+        async with db_lock:
+            if not db_state["users"] or not AI_AUTONOMY.get("enabled", True):
+                continue
+            ai_log("📢 AI marketing kampaniyasi boshlandi", "INFO")
+            try:
+                active_campaigns = [c for c in db_state["marketing_campaigns"] if c.get("active", False)]
+                max_campaigns = AI_AUTONOMY.get("max_campaigns", 8)
+                if len(active_campaigns) >= max_campaigns:
+                    ai_log(f"⚠️ Maksimal kampaniya soniga yetildi ({max_campaigns})", "WARNING")
+                    continue
+
+                # Eng yaxshi yoki eng kam sotilgan mahsulotni tanlash
+                best_product = None
+                best_score = -1
+                for product in ECOMMERCE["products"]:
+                    perf = db_state["product_performance"].get(product["id"], {})
+                    sales_count = perf.get("sales_count", 0)
+                    if sales_count == 0:
+                        best_product = product
+                        break
+                    if sales_count < best_score or best_score == -1:
+                        best_score = sales_count
+                        best_product = product
+                if not best_product:
+                    best_product = random.choice(ECOMMERCE["products"])
+
+                # Kampaniya turlari
+                campaign_types = ["discount", "bundle", "limited_time", "free_shipping", "referral", "urgent", "social_proof"]
+                campaign_type = random.choice(campaign_types)
+                campaign_messages = {
+                    "discount": f"🔥 MAXSUS CHEGIRMA: {best_product['name']} 20% chegirma bilan!",
+                    "bundle": f"📦 KOMPLEKT: {best_product['name']} + bonus sovg'a!",
+                    "limited_time": f"⏳ VAQT CHEKLANGAN: {best_product['name']} faqat bugun!",
+                    "free_shipping": f"🚚 BEPUL YETKAZIB BERISH: {best_product['name']} uchun!",
+                    "referral": f"👥 DO'STINGIZNI TAKLIF QILING: 1000 token sovg'a!",
+                    "urgent": f"🚨 OXIRGI IMKONIYAT: {best_product['name']} zaxirada tugamoqda!",
+                    "social_proof": f"⭐ {random.randint(100, 500)} ta mijoz {best_product['name']} ni tavsiya qiladi!"
+                }
+                message = campaign_messages.get(campaign_type, f"🌟 {best_product['name']} - eng yaxshi tanlov!")
+
+                # Maqsadli auditoriyani aniqlash (AI yordamida)
+                target_audience = "All users"
+                if db_state["users"]:
+                    # Faol foydalanuvchilarni aniqlash
+                    active_users = [u for u, a in db_state["user_activity"].items() 
+                                  if a.get("last_active", "").startswith(datetime.now().date().isoformat())]
+                    if active_users:
+                        target_audience = f"Active users ({len(active_users)} ta)"
+
+                campaign = {
+                    "id": generate_post_id(),
+                    "product_id": best_product["id"],
+                    "product_name": best_product["name"],
+                    "type": campaign_type,
+                    "message": message,
+                    "created_at": datetime.now().isoformat(),
+                    "target_audience": target_audience,
+                    "budget": random.randint(50, 500),
+                    "active": True,
+                    "conversions": 0,
+                    "impressions": random.randint(100, 1000),
+                    "ctr": 0.0,
+                    "spent": 0,
+                    "status": "active"
+                }
+                db_state["marketing_campaigns"].append(campaign)
+                if len(db_state["marketing_campaigns"]) > 20:
+                    db_state["marketing_campaigns"] = db_state["marketing_campaigns"][-20:]
+
+                # AI tomonidan yaratilgan reklama posti
+                post_text = f"📢 {campaign['message']}\n\n🛒 Sotib olish: http://127.0.0.1:5050/\n#BioEmpire #Reklama #{best_product['category']}"
+                post = generate_social_post("🧬 BioEmpire_AI", post_text, True)
+                add_social_post(post)
+
+                # Bildirishnoma
+                for username in db_state["users"].keys():
+                    if random.random() < 0.25:
+                        notif = generate_notification(username, f"📢 Yangi taklif: {campaign['message']}", "marketing")
+                        add_notification(notif)
+
+                ai_log(f"✅ Kampaniya yaratildi: {campaign['type']} - {best_product['name']}", "INFO")
+                await save_state()
+            except Exception as e:
+                ai_log(f"❌ Marketing vazifasida xatolik: {e}", "ERROR")
+
+# ==========================================
+# 3. AVTONOM AI – ADS OPTIMIZER (A/B TEST, ANALIZ, OPTIMALLASHTIRISH)
+# ==========================================
+async def ai_ads_optimizer_task():
+    """
+    AI tomonidan reklama kampaniyalarini optimallashtirish:
+    - Har bir kampaniyaning samaradorligini tahlil qiladi (CTR, konversiya)
+    - Eng yaxshi kampaniyalarni kuchaytiradi (ko'proq byudjet)
+    - Yomon kampaniyalarni to'xtatadi
+    - A/B testlar o'tkazadi
+    - Yangi strategiyalar ishlab chiqadi
+    """
+    while True:
+        await asyncio.sleep(AUTO_ADS_OPTIMIZER_INTERVAL)
+        async with db_lock:
+            if not db_state["users"] or not AI_AUTONOMY.get("enabled", True):
+                continue
+            ai_log("📊 AI ADS optimizer boshlandi", "INFO")
+            try:
+                campaigns = db_state["marketing_campaigns"]
+                active_campaigns = [c for c in campaigns if c.get("active", False)]
+                
+                if not active_campaigns:
+                    ai_log("⚠️ Faol kampaniyalar yo'q", "WARNING")
+                    continue
+
+                # 1. Har bir kampaniyaning samaradorligini hisoblash
+                campaign_performance = []
+                for c in active_campaigns:
+                    # Konversiya darajasi (sotuvlar)
+                    sales = [s for s in db_state["product_sales"] if s.get("product_id") == c.get("product_id")]
+                    conversions = len(sales)
+                    impressions = c.get("impressions", 100)
+                    ctr = conversions / max(1, impressions / 100)  # Simulyatsiya
+                    roi = conversions * 100 / max(1, c.get("budget", 100))
+                    
+                    performance = {
+                        "campaign_id": c["id"],
+                        "product_name": c["product_name"],
+                        "type": c["type"],
+                        "conversions": conversions,
+                        "impressions": impressions,
+                        "ctr": ctr,
+                        "roi": roi,
+                        "budget": c.get("budget", 100),
+                        "spent": c.get("spent", 0),
+                        "active": c.get("active", True)
+                    }
+                    campaign_performance.append(performance)
+                    
+                    # Kampaniya samaradorligini saqlash
+                    db_state["ads_performance"][c["id"]] = performance
+
+                # 2. Kampaniyalarni saralash (eng yaxshidan eng yomonga)
+                sorted_campaigns = sorted(campaign_performance, key=lambda x: x["ctr"] + x["roi"], reverse=True)
+
+                # 3. Eng yaxshi kampaniyalarni kuchaytirish
+                top_count = min(3, len(sorted_campaigns))
+                for i in range(top_count):
+                    if i < len(sorted_campaigns):
+                        c = sorted_campaigns[i]
+                        # Kampaniyani topish
+                        for camp in db_state["marketing_campaigns"]:
+                            if camp["id"] == c["campaign_id"]:
+                                # Byudjetni oshirish
+                                old_budget = camp.get("budget", 100)
+                                new_budget = old_budget * 1.2  # 20% ga oshirish
+                                camp["budget"] = round(new_budget, 2)
+                                camp["impressions"] = camp.get("impressions", 100) + random.randint(50, 200)
+                                ai_log(f"📈 Kampaniya kuchaytirildi: {c['product_name']} (byudjet: ${old_budget} -> ${new_budget:.0f})", "INFO")
+                                break
+
+                # 4. Eng yomon kampaniyalarni to'xtatish
+                bottom_count = min(2, len(sorted_campaigns) // 2)
+                if len(sorted_campaigns) > 3:
+                    for i in range(len(sorted_campaigns) - bottom_count, len(sorted_campaigns)):
+                        if i < len(sorted_campaigns):
+                            c = sorted_campaigns[i]
+                            # Kampaniyani to'xtatish
+                            for camp in db_state["marketing_campaigns"]:
+                                if camp["id"] == c["campaign_id"]:
+                                    if camp.get("active", True):
+                                        camp["active"] = False
+                                        camp["status"] = "stopped"
+                                        ai_log(f"⛔ Kampaniya to'xtatildi: {c['product_name']} (CTR: {c['ctr']:.2f})", "WARNING")
+                                        break
+
+                # 5. A/B test – yangi kampaniya yaratish (agar kampaniyalar soni kam bo'lsa)
+                if len(active_campaigns) < AI_AUTONOMY.get("max_campaigns", 8):
+                    # Eng yaxshi kampaniyani asos qilib olish
+                    if sorted_campaigns:
+                        best = sorted_campaigns[0]
+                        product = next((p for p in ECOMMERCE["products"] if p["id"] == best["campaign_id"]), None)
+                        if product:
+                            # Yangi variant yaratish
+                            variant_types = ["discount", "bundle", "limited_time", "urgent"]
+                            variant_type = random.choice([t for t in variant_types if t != best.get("type", "discount")])
+                            variant_messages = {
+                                "discount": f"🔥 MAXSUS CHEGIRMA: {product['name']} 25% chegirma bilan!",
+                                "bundle": f"📦 KOMPLEKT: {product['name']} + bonus sovg'a!",
+                                "limited_time": f"⏳ VAQT CHEKLANGAN: {product['name']} faqat bugun!",
+                                "urgent": f"🚨 OXIRGI IMKONIYAT: {product['name']} zaxirada tugamoqda!"
+                            }
+                            message = variant_messages.get(variant_type, f"🌟 {product['name']} - eng yaxshi tanlov!")
+
+                            new_campaign = {
+                                "id": generate_post_id(),
+                                "product_id": product["id"],
+                                "product_name": product["name"],
+                                "type": variant_type,
+                                "message": message,
+                                "created_at": datetime.now().isoformat(),
+                                "target_audience": "A/B Test Group",
+                                "budget": 50,
+                                "active": True,
+                                "conversions": 0,
+                                "impressions": 0,
+                                "ctr": 0.0,
+                                "spent": 0,
+                                "status": "ab_test"
+                            }
+                            db_state["marketing_campaigns"].append(new_campaign)
+                            ai_log(f"🧪 A/B test kampaniyasi yaratildi: {variant_type} - {product['name']}", "INFO")
+
+                            # A/B test haqida post
+                            post_text = f"🧪 AI A/B test o'tkazmoqda: {product['name']} uchun yangi reklama varianti sinovdan o'tkazilmoqda!\n\n📢 {message}\n#BioEmpire #ABTest"
+                            post = generate_social_post("🧬 BioEmpire_AI", post_text, True)
+                            add_social_post(post)
+
+                # 6. Umumiy byudjetni optimallashtirish
+                total_budget = sum(c.get("budget", 0) for c in db_state["marketing_campaigns"])
+                max_budget = AI_AUTONOMY.get("ads_budget", 10000)
+                if total_budget > max_budget:
+                    # Byudjetni qisqartirish
+                    for c in db_state["marketing_campaigns"]:
+                        if c.get("active", False):
+                            old_budget = c.get("budget", 100)
+                            c["budget"] = round(old_budget * 0.9, 2)
+                    ai_log(f"💰 Byudjet optimallashtirildi: {total_budget:.0f} -> {max_budget:.0f}", "INFO")
+
+                # 7. AI tomonidan yangi marketing strategiyasi ishlab chiqish
+                if random.random() < 0.2:  # 20% ehtimol
+                    messages = [
+                        {"role": "system", "content": "Siz BioEmpire tizimining AI marketing strategistisiz. Kampaniya natijalariga qarab yangi marketing strategiyasini ishlab chiqing."},
+                        {"role": "user", "content": f"Kampaniya natijalari: {json.dumps(campaign_performance[:3])}. Qanday yangi strategiya tavsiya qilasiz?"}
+                    ]
+                    ai_strategy = await call_ai_api(messages)
+                    if ai_strategy:
+                        db_state["ai_strategies"].append({
+                            "timestamp": datetime.now().isoformat(),
+                            "strategy": ai_strategy
+                        })
+                        ai_log(f"🧠 AI yangi strategiya ishlab chiqdi: {ai_strategy[:100]}...", "INFO")
+
+                await save_state()
+                ai_log(f"✅ ADS optimizer yakunlandi. {len(active_campaigns)} ta faol kampaniya", "INFO")
+            except Exception as e:
+                ai_log(f"❌ ADS optimizerda xatolik: {e}", "ERROR")
+
+# ==========================================
+# 4. AVTONOM AI – QAROR QABUL QILISH
+# ==========================================
+async def ai_decision_maker_task():
+    while True:
+        await asyncio.sleep(AUTO_DECISION_INTERVAL)
+        async with db_lock:
+            if not db_state["users"] or not AI_AUTONOMY.get("enabled", True):
+                continue
+            ai_log("🧠 AI qaror qabul qilish bosqichi boshlandi", "INFO")
+            try:
+                decisions = []
+                threshold = AI_AUTONOMY.get("decision_threshold", 0.7)
+
+                # 1. Narxlarni optimallashtirish
+                for product in ECOMMERCE["products"]:
+                    perf = db_state["product_performance"].get(product["id"], {})
+                    sales_count = perf.get("sales_count", 0)
+                    current_price = product["price_usd"]
+                    if sales_count < 3 and current_price > 1000:
+                        new_price = current_price * 0.85
+                        if new_price < 100:
+                            new_price = 100
+                        decisions.append({
+                            "type": "price_change",
+                            "product_id": product["id"],
+                            "product_name": product["name"],
+                            "old_price": current_price,
+                            "new_price": round(new_price, 2),
+                            "reason": f"Sotuvlar soni {sales_count} ta"
+                        })
+                    elif sales_count > 10:
+                        max_change = AI_AUTONOMY.get("max_price_change_percent", 30)
+                        increase = random.uniform(0.05, 0.15)
+                        new_price = current_price * (1 + increase)
+                        if new_price < current_price * (1 + max_change/100):
+                            decisions.append({
+                                "type": "price_change",
+                                "product_id": product["id"],
+                                "product_name": product["name"],
+                                "old_price": current_price,
+                                "new_price": round(new_price, 2),
+                                "reason": f"Talab yuqori ({sales_count} sotuv)"
+                            })
+
+                # 2. Yangi mahsulot tavsiya qilish
+                if len(ECOMMERCE["products"]) < 15:
+                    new_product_categories = ["supplement", "device", "therapy", "elite"]
+                    category = random.choice(new_product_categories)
+                    new_product_names = {
+                        "supplement": ["BioBoost X2", "NeuroVital Plus", "Immune Shield Pro"],
+                        "device": ["NeuroBand 2.0", "BioScanner Mini", "Quantum Healer"],
+                        "therapy": ["CellRegen Therapy", "DNA Repair Kit", "Immortality Protocol"],
+                        "elite": ["GodMode Elixir", "Immortal DNA", "Quantum Ascension"]
+                    }
+                    name = random.choice(new_product_names.get(category, ["New Product"]))
+                    price = random.randint(10000, 500000)
+                    desc = f"AI tomonidan tavsiya etilgan yangi {category} mahsuloti"
+                    exists = any(p["name"] == name for p in ECOMMERCE["products"])
+                    if not exists:
+                        decisions.append({
+                            "type": "new_product",
+                            "product_name": name,
+                            "category": category,
+                            "price": price,
+                            "desc": desc,
+                            "reason": "Mahsulot assortimentini kengaytirish"
+                        })
+
+                # 3. Tizim yaxshilanishi
+                total_users = len(db_state["users"])
+                if total_users > 0:
+                    active_users = len([u for u in db_state["user_activity"].values() 
+                                      if u.get("last_active", "").startswith(datetime.now().date().isoformat())])
+                    active_ratio = active_users / total_users
+                    if active_ratio < threshold:
+                        decisions.append({
+                            "type": "system_improvement",
+                            "action": "increase_engagement",
+                            "reason": f"Faollik nisbati past ({active_ratio:.1%})",
+                            "suggestion": "Kunlik bonus va eslatmalar yuborish"
+                        })
+
+                # 4. Avtomatik zaxiralash
+                if AI_AUTONOMY.get("auto_restock_enabled", True):
+                    for product in ECOMMERCE["products"]:
+                        perf = db_state["product_performance"].get(product["id"], {})
+                        sales_count = perf.get("sales_count", 0)
+                        if sales_count > 5 and random.random() < 0.2:
+                            decisions.append({
+                                "type": "restock",
+                                "product_id": product["id"],
+                                "product_name": product["name"],
+                                "quantity": random.randint(10, 50),
+                                "reason": "Zaxirani yangilash"
+                            })
+
+                # Qarorlarni amalga oshirish
+                for decision in decisions:
+                    if decision["type"] == "price_change":
+                        for i, p in enumerate(ECOMMERCE["products"]):
+                            if p["id"] == decision["product_id"]:
+                                ECOMMERCE["products"][i]["price_usd"] = decision["new_price"]
+                                break
+                        ai_log(f"💰 Narx o'zgartirildi: {decision['product_name']}", "INFO")
+                    elif decision["type"] == "new_product":
+                        new_product = {
+                            "id": f"prod_{random.randint(100, 999)}",
+                            "name": decision["product_name"],
+                            "price_usd": decision["price"],
+                            "desc": decision["desc"],
+                            "category": decision["category"]
+                        }
+                        ECOMMERCE["products"].append(new_product)
+                        ai_log(f"🆕 Yangi mahsulot qo'shildi: {decision['product_name']}", "INFO")
+                    elif decision["type"] == "system_improvement":
+                        ai_log(f"⚡ Tizim yaxshilanishi: {decision['suggestion']}", "INFO")
+                    elif decision["type"] == "restock":
+                        ai_log(f"📦 Zaxira yangilandi: {decision['product_name']} (+{decision['quantity']})", "INFO")
+
+                if decisions:
+                    db_state["ai_decisions"].append({
+                        "timestamp": datetime.now().isoformat(),
+                        "decisions": decisions,
+                        "count": len(decisions)
+                    })
+                    if len(db_state["ai_decisions"]) > 100:
+                        db_state["ai_decisions"] = db_state["ai_decisions"][-100:]
+                    post_text = f"🧠 AI qaror qabul qildi: {len(decisions)} ta o'zgarish"
+                    post = generate_social_post("🧬 BioEmpire_AI", post_text, True)
+                    add_social_post(post)
+
+                ai_log(f"✅ {len(decisions)} ta qaror qabul qilindi", "INFO")
+                await save_state()
+            except Exception as e:
+                ai_log(f"❌ Qaror qabul qilishda xatolik: {e}", "ERROR")
+
+# ==========================================
+# 5. AUTH
+# ==========================================
 @app.post("/api/v2/auth/signup")
 async def signup(user: UserRegister):
     async with db_lock:
-        # 1. Username mavjudligini tekshirish
-        if user.username in db["users"]:
+        if user.username in db_state["users"]:
             raise HTTPException(status_code=400, detail="Bu username allaqachon band.")
-        
-        # 2. Valyutani aniqlash
         curr = user.currency.upper()
-        if curr not in ["USD", "EUR", "BTC", "SOL"]:
+        if curr not in EXCHANGE_RATES:
             curr = "USD"
-        
-        # 3. Boshlang'ich balans
-        rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
-        initial_balance = 25000.0 * rates.get(curr, 1.0)
-        
-        # 4. Foydalanuvchini qo'shish
-        db["users"][user.username] = {
+        initial_balance = 25000.0 * EXCHANGE_RATES[curr]
+        db_state["users"][user.username] = {
             "email": user.email,
             "password_hash": hash_password(user.password),
             "currency": curr,
@@ -194,40 +839,30 @@ async def signup(user: UserRegister):
             "status": "WARNING",
             "department": "None",
             "health_score": 85.0,
+            "last_purchase": None,
+            "packages": [],
             "avatar": "🧬",
             "bio": "BioEmpire tizimiga yangi qo'shildim",
             "registered_at": datetime.now().isoformat()
         }
-        
-        # 5. Aktiv foydalanuvchilar sonini yangilash
-        db["system_vault"]["active_users"] = len(db["users"])
-        
-        # 6. Faylga saqlash
-        if not save_db(db):
-            raise HTTPException(status_code=500, detail="Ma'lumotlarni saqlashda xatolik.")
-        
-        return {
-            "status": "success",
-            "username": user.username,
-            "balance": initial_balance,
-            "currency": curr
-        }
+        db_state["system_vault"]["active_users"] = len(db_state["users"])
+        welcome_post = generate_social_post(user.username, f"🌟 Salom hammaga! Men {user.username}, BioEmpire tizimiga endi qo'shildim!", False)
+        welcome_post["likes"] = random.randint(5, 30)
+        add_social_post(welcome_post)
+        track_user_activity(user.username, "signup")
+        await save_state()
+        return {"status": "success", "username": user.username, "balance": initial_balance, "currency": curr}
 
-# ===== AUTH - KIRISH =====
 @app.post("/api/v2/auth/signin")
 async def signin(user: UserLogin):
     async with db_lock:
-        # 1. Foydalanuvchi mavjudligini tekshirish
-        if user.username not in db["users"]:
+        if user.username not in db_state["users"]:
             raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
-        
-        target = db["users"][user.username]
-        
-        # 2. Parolni tekshirish
+        target = db_state["users"][user.username]
         if target["password_hash"] != hash_password(user.password):
             raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
-        
-        # 3. Muvaffaqiyatli javob
+        track_user_activity(user.username, "signin")
+        await save_state()
         return {
             "status": "success",
             "username": user.username,
@@ -240,138 +875,57 @@ async def signin(user: UserLogin):
             "bio": target.get("bio", "")
         }
 
-# ===== PROFILE =====
+# ==========================================
+# 6. PROFIL VA FEED (qisqa)
+# ==========================================
 @app.get("/api/v2/profile/{username}")
 async def get_profile(username: str):
     async with db_lock:
-        if username not in db["users"]:
+        if username not in db_state["users"]:
             raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
-        return db["users"][username]
+        return db_state["users"][username]
 
-# ===== SOCIAL =====
+@app.get("/api/v2/feed")
+async def get_feed():
+    async with db_lock:
+        return db_state["feed"]
+
 @app.get("/api/v2/social/posts")
-async def social_posts():
-    return db.get("social_posts", [])
+async def get_social_posts():
+    async with db_lock:
+        return db_state["social_posts"]
 
 @app.post("/api/v2/social/post")
-async def create_post(req: SocialPostRequest):
+async def create_social_post(req: SocialPostRequest):
     async with db_lock:
-        if req.username not in db["users"]:
-            raise HTTPException(404, "Foydalanuvchi topilmadi.")
-        
-        post = {
-            "id": generate_post_id(),
-            "username": req.username,
-            "content": req.content,
-            "timestamp": datetime.now().strftime("%H:%M:%S"),
-            "likes": 0,
-            "comments": []
-        }
-        db["social_posts"].insert(0, post)
-        if len(db["social_posts"]) > 100:
-            db["social_posts"] = db["social_posts"][:100]
-        save_db(db)
+        if req.username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        post = generate_social_post(req.username, req.content, False)
+        add_social_post(post)
+        track_user_activity(req.username, "social_post", {"content": req.content[:50]})
+        await save_state()
+        await manager.broadcast({"type": "new_post", "post": post})
         return post
 
 @app.post("/api/v2/social/like")
-async def like(req: LikeRequest):
+async def like_post(req: LikeRequest):
     async with db_lock:
-        for post in db["social_posts"]:
+        if req.username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        for post in db_state["social_posts"]:
             if post["id"] == req.post_id:
-                post["likes"] = post.get("likes", 0) + 1
-                save_db(db)
+                if "likes" not in post:
+                    post["likes"] = 0
+                post["likes"] += 1
+                await save_state()
                 return {"success": True, "likes": post["likes"]}
-        raise HTTPException(404, "Post topilmadi.")
+        raise HTTPException(status_code=404, detail="Post topilmadi.")
 
-@app.post("/api/v2/social/comment")
-async def comment(req: CommentRequest):
-    async with db_lock:
-        for post in db["social_posts"]:
-            if post["id"] == req.post_id:
-                comment_obj = {
-                    "username": req.username,
-                    "text": req.comment,
-                    "timestamp": datetime.now().isoformat()
-                }
-                if "comments" not in post:
-                    post["comments"] = []
-                post["comments"].append(comment_obj)
-                save_db(db)
-                return {"success": True, "comment": comment_obj}
-        raise HTTPException(404, "Post topilmadi.")
-
-# ===== AI CHAT =====
-@app.post("/api/v2/ai/chat")
-async def ai_chat(req: AIChatRequest):
-    async with db_lock:
-        if req.username not in db["users"]:
-            raise HTTPException(404, "Foydalanuvchi topilmadi.")
-        
-        user = db["users"][req.username]
-        chat_price = 49.0
-        rate = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
-        price = chat_price * rate.get(user["currency"], 1.0)
-        
-        if user["balance"] < price:
-            return {"success": False, "message": f"⚠️ AI chat uchun ${price:.2f} kerak."}
-        
-        user["balance"] -= price
-        db["system_vault"]["total_revenue"] += price
-        save_db(db)
-        
-        messages = [
-            {"role": "system", "content": "Siz BioEmpire AI shifokorisiz. Kasalliklar haqida batafsil ma'lumot bering."},
-            {"role": "user", "content": req.message}
-        ]
-        ai_response = await call_ai_api(messages)
-        if not ai_response:
-            ai_response = "AI hozir javob bera olmadi. Keyinroq urinib ko'ring."
-        
-        return {"success": True, "response": ai_response, "new_balance": user["balance"], "deducted": price}
-
-# ===== CAMERA =====
-@app.post("/api/v2/camera/analyze")
-async def camera_analyze(req: CameraAnalysisRequest):
-    async with db_lock:
-        if req.username not in db["users"]:
-            raise HTTPException(404, "Foydalanuvchi topilmadi.")
-        
-        user = db["users"][req.username]
-        analysis_price = 150.0
-        rate = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
-        price = analysis_price * rate.get(user["currency"], 1.0)
-        
-        if user["balance"] < price:
-            return {"success": False, "message": f"⚠️ Kamera analizi uchun ${price:.2f} kerak."}
-        
-        user["balance"] -= price
-        db["system_vault"]["total_revenue"] += price
-        save_db(db)
-        
-        analysis_result = "🔬 Rasm tahlili: Teri toshmasi aniqlangan. Dermatologga murojaat qilish tavsiya etiladi."
-        
-        if req.image_data and GEMINI_AVAILABLE and GEMINI_API_KEY:
-            try:
-                image_data = req.image_data.split(",")[1] if "," in req.image_data else req.image_data
-                image_bytes = base64.b64decode(image_data)
-                model = genai.GenerativeModel(GEMINI_MODEL)
-                response = await asyncio.to_thread(
-                    model.generate_content,
-                    ["Ushbu rasmni tahlil qiling va diagnostik tavsiya bering.", {"mime_type": "image/jpeg", "data": image_bytes}]
-                )
-                if response and response.text:
-                    analysis_result = "🔬 " + response.text
-            except Exception as e:
-                analysis_result = f"🔬 Rasm tahlilida xatolik: {e}"
-        
-        return {"success": True, "analysis": analysis_result, "new_balance": user["balance"], "deducted": price}
-
-# ===== HEALTH RANKING =====
 @app.get("/api/v2/health/ranking")
-async def health_ranking():
+async def get_health_ranking():
     async with db_lock:
         ranking = []
-        for username, user in db["users"].items():
+        for username, user in db_state["users"].items():
             ranking.append({
                 "username": username,
                 "health_score": user.get("health_score", 0),
@@ -381,709 +935,618 @@ async def health_ranking():
         ranking.sort(key=lambda x: x["health_score"], reverse=True)
         return ranking
 
-# ===== STATS =====
+# ==========================================
+# 7. KLINIK QABUL (AI bilan)
+# ==========================================
+@app.post("/api/v2/clinical/encounter")
+async def clinical_encounter(payload: PainInput):
+    username = payload.username
+    async with db_lock:
+        if username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Subyekt topilmadi.")
+        user = db_state["users"][username]
+        currency = user["currency"]
+        rate = EXCHANGE_RATES[currency]
+
+        dept = DEPARTMENTS.get(payload.department_id)
+        is_red_zone = False
+        if not dept:
+            dept = RED_ZONE_DEPARTMENTS.get(payload.department_id)
+            is_red_zone = True
+            if not dept:
+                raise HTTPException(status_code=400, detail="Noto'g'ri bo'lim ID.")
+        dept_name = dept["uz"]
+
+        total_deduction = 170.0 * rate
+        if user["balance"] < total_deduction:
+            user["status"] = "RED_ZONE"
+            await save_state()
+            return {
+                "responses": [
+                    "⚠️ DIQQAT: Balansingiz kritik darajada past!",
+                    "☣️ Tizim bio-kollaps xavfini aniqladi!",
+                    "💀 Menda yomon yangilik bor!"
+                ],
+                "deducted": 0,
+                "new_balance": user["balance"],
+                "status": "RED_ZONE"
+            }
+
+        user["balance"] -= total_deduction
+        user["department"] = dept_name
+        db_state["system_vault"]["total_revenue"] += total_deduction
+
+        messages = [
+            {"role": "system", "content": "Siz BioEmpire tizimining AI shifokorisiz. Foydalanuvchi simptomlarini tahlil qiling va 3 ta qisqa, dahshatli va ishonarli javob bering."},
+            {"role": "user", "content": f"Bo'lim: {dept_name}. Simptom: {payload.text}. Foydalanuvchi holati: {user['status']}, salomatlik: {user['health_score']}%."}
+        ]
+        ai_response = await call_ai_api(messages)
+        if ai_response:
+            responses = ai_response.split('\n')
+            responses = [r.strip() for r in responses if r.strip()][:3]
+        else:
+            responses = [
+                f"📊 [BIO-AUDIT]: {dept_name} bo'limida hujayra degradatsiyasi 76.3%.",
+                f"☣️ [IJTIMOIY KONTAINER]: Toksik odamlardan yuqqan (91.8%)!",
+                f"🧾 [TO'LOV]: ${total_deduction:.2f} yechildi."
+            ]
+        if is_red_zone:
+            responses[0] += " ☣️ QIZIL BO'LIM!"
+
+        post_text = f"⚡ {username} {dept_name} bo'limida diagnostikadan o'tdi."
+        post = generate_feed_post(username, dept_name, post_text)
+        add_to_feed(post)
+        track_user_activity(username, "clinical_encounter", {"department": dept_name, "cost": total_deduction})
+        await save_state()
+        return {"responses": responses, "deducted": total_deduction, "new_balance": user["balance"], "status": user["status"], "health_score": user["health_score"]}
+
+# ==========================================
+# 8. PAKET SOTIB OLISH
+# ==========================================
+@app.post("/api/v2/clinical/purchase")
+async def purchase_package(req: PurchaseRequest):
+    username = req.username
+    async with db_lock:
+        if username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Subyekt topilmadi.")
+        user = db_state["users"][username]
+        currency = user["currency"]
+        rate = EXCHANGE_RATES[currency]
+
+        pkg = PACKAGES.get(req.package_type)
+        if not pkg:
+            raise HTTPException(status_code=400, detail="Noma'lum paket turi.")
+
+        price_usd = pkg["price_usd"]
+        price_converted = price_usd * rate
+
+        if user["balance"] < price_converted:
+            user["status"] = "RED_ZONE"
+            await save_state()
+            return {"success": False, "message": "Mablag' yetishmasligi!", "status": "RED_ZONE"}
+
+        user["balance"] -= price_converted
+        db_state["system_vault"]["total_revenue"] += price_converted
+        user["status"] = pkg["status"]
+        user["health_score"] = min(100.0, user["health_score"] + 15.0)
+        if req.package_type == "red_zone_vip":
+            user["health_score"] = 100.0
+            user["status"] = "IMMORTAL"
+
+        if "packages" not in user:
+            user["packages"] = []
+        user["packages"].append({"type": req.package_type, "purchased_at": datetime.now().isoformat()})
+        track_user_activity(username, "purchase", {"package": req.package_type, "cost": price_converted})
+        if "total_spent" in db_state["user_activity"][username]:
+            db_state["user_activity"][username]["total_spent"] += price_converted
+            db_state["user_activity"][username]["packages_bought"] += 1
+
+        package_messages = {
+            "1_week": "🔄 1-haftalik paket faollashtirildi.",
+            "1_month": "👑 1 oylik davo boshlanmoqda.",
+            "3_month": "🏆 3 oylik premium davo!",
+            "6_month": "⭐ 6 oylik paket + Analyst bonus!",
+            "1_year": "👑 1 yillik ustun davo!",
+            "3_year": "💎 3 yillik mukammal davo!",
+            "6_year": "♾️ 6 yillik abadiy davo.",
+            "10_year": "🌌 10 yillik o'lmaslik matritsasi.",
+            "red_zone_vip": "☣️ QIZIL ZONA VIP!",
+            "gadget": "📦 Gadget xarid qilindi.",
+            "meds": "📦 Kvant dorilar xarid qilindi."
+        }
+        msg = package_messages.get(req.package_type, f"📦 Paket xarid qilindi.")
+        post = generate_feed_post(username, user["department"], msg)
+        add_to_feed(post)
+        await save_state()
+        return {"success": True, "message": msg, "new_balance": user["balance"], "status": user["status"], "health_score": user["health_score"]}
+
+# ==========================================
+# 9. AI CHAT
+# ==========================================
+@app.post("/api/v2/ai/chat")
+async def ai_chat(req: AIChatRequest):
+    async with db_lock:
+        if req.username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        user = db_state["users"][req.username]
+        currency = user["currency"]
+        rate = EXCHANGE_RATES[currency]
+
+        chat_price = CHAT_PRICE_USD * rate
+        if user["balance"] < chat_price:
+            return {"success": False, "message": f"⚠️ AI chat uchun ${chat_price:.2f} kerak."}
+
+        user["balance"] -= chat_price
+        db_state["system_vault"]["total_revenue"] += chat_price
+        track_user_activity(req.username, "ai_chat", {"message": req.message[:50]})
+
+        if req.username not in ai_chat_history:
+            ai_chat_history[req.username] = []
+        history = ai_chat_history[req.username]
+        history.append({"role": "user", "content": req.message})
+        if len(history) > MAX_AI_HISTORY:
+            history = history[-MAX_AI_HISTORY:]
+
+        messages = [
+            {"role": "system", "content": "Siz BioEmpire tizimining AI yordamchisisiz. Sog'liq, davolanish haqida ma'lumot berasiz. Professional, ammo biroz dahshatli ohangda gapiring."},
+            {"role": "system", "content": f"Foydalanuvchi: {req.username}. Holati: {user['status']}. Salomatlik: {user['health_score']}%. Balans: {user['balance']} {currency}."},
+        ]
+        messages.extend(history[-10:])
+        ai_response = await call_ai_api(messages)
+        if not ai_response:
+            ai_response = f"🧬 [AI ANALYST]: {user['status']} holatidasiz. Sizga {random.choice(['1 oylik paket', 'Qizil zona tekshiruvi'])} tavsiya etiladi."
+
+        history.append({"role": "assistant", "content": ai_response})
+        ai_chat_history[req.username] = history
+        await save_state()
+        return {"success": True, "response": ai_response, "new_balance": user["balance"], "deducted": chat_price}
+
+# ==========================================
+# 10. KAMERA AI ANALIZI
+# ==========================================
+@app.post("/api/v2/camera/analyze")
+async def camera_analyze(req: CameraAnalysisRequest):
+    async with db_lock:
+        if req.username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        user = db_state["users"][req.username]
+        currency = user["currency"]
+        rate = EXCHANGE_RATES[currency]
+
+        analysis_price = CAMERA_PRICE_USD * rate
+        if user["balance"] < analysis_price:
+            return {"success": False, "message": f"⚠️ Kamera analizi uchun ${analysis_price:.2f} kerak."}
+
+        user["balance"] -= analysis_price
+        db_state["system_vault"]["total_revenue"] += analysis_price
+
+        dept = DEPARTMENTS.get(req.department_id) or RED_ZONE_DEPARTMENTS.get(req.department_id)
+        dept_name = dept["uz"] if dept else "Noma'lum"
+        track_user_activity(req.username, "camera_analysis", {"department": dept_name})
+
+        messages = [
+            {"role": "system", "content": "Siz BioEmpire tizimining AI analistisisiz. Kamera orqali olingan ma'lumotlarni tahlil qiling va qisqa tavsiya bering."},
+            {"role": "user", "content": f"Bo'lim: {dept_name}. Foydalanuvchi holati: {user['status']}."}
+        ]
+        ai_analysis = await call_ai_api(messages)
+        if not ai_analysis:
+            ai_analysis = f"🔬 [KAMERA AI]: {dept_name} da {random.randint(70,95)}% patologik o'zgarish."
+
+        await save_state()
+        return {"success": True, "analysis": ai_analysis, "new_balance": user["balance"], "deducted": analysis_price}
+
+# ==========================================
+# 11. ODDIY CHAT (fallback)
+# ==========================================
+@app.post("/api/v2/chat")
+async def chat_with_ai(req: ChatRequest):
+    async with db_lock:
+        if req.username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        user = db_state["users"][req.username]
+        currency = user["currency"]
+        rate = EXCHANGE_RATES[currency]
+
+        chat_price = CHAT_PRICE_USD * rate
+        if user["balance"] < chat_price:
+            return {"success": False, "message": f"⚠️ Chat uchun ${chat_price:.2f} kerak."}
+
+        user["balance"] -= chat_price
+        db_state["system_vault"]["total_revenue"] += chat_price
+        track_user_activity(req.username, "chat", {"message": req.message[:50]})
+
+        responses = [
+            f"🧬 [AI ANALYST]: Neyron sinapslar {random.randint(60,90)}% anormallik bor.",
+            f"⚡ [DIAGNOSTIKA]: Virusli infektsiyaga o'xshaydi!",
+            f"☣️ [XAVF]: Atrofingizdagi odamlarning 78% toksik!",
+            f"💊 [RETSEPT]: NeuroRegen X1 tavsiya qilaman.",
+            f"📊 [PROGNOZ]: 30 kun ichida 45% yomonlashadi."
+        ]
+        ai_response = random.choice(responses)
+        await save_state()
+        return {"success": True, "response": ai_response, "new_balance": user["balance"], "deducted": chat_price}
+
+# ==========================================
+# 12. E-COMMERCE
+# ==========================================
+@app.get("/api/v2/ecommerce/products")
+async def get_products():
+    return ECOMMERCE["products"]
+
+@app.post("/api/v2/ecommerce/order")
+async def place_order(req: ProductOrderRequest):
+    username = req.username
+    async with db_lock:
+        if username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        user = db_state["users"][username]
+        currency = user["currency"]
+        rate = EXCHANGE_RATES[currency]
+
+        product = None
+        for p in ECOMMERCE["products"]:
+            if p["id"] == req.product_id:
+                product = p
+                break
+        if not product:
+            raise HTTPException(status_code=400, detail="Mahsulot topilmadi.")
+
+        total_price = product["price_usd"] * rate * req.quantity
+        if user["balance"] < total_price:
+            return {"success": False, "message": f"⚠️ ${total_price:.2f} kerak."}
+
+        user["balance"] -= total_price
+        db_state["system_vault"]["total_revenue"] += total_price
+
+        order = {
+            "id": generate_post_id(),
+            "username": username,
+            "product_id": req.product_id,
+            "product_name": product["name"],
+            "quantity": req.quantity,
+            "total_price": total_price,
+            "currency": currency,
+            "ordered_at": datetime.now().isoformat(),
+            "status": "pending"
+        }
+        db_state["product_sales"].append(order)
+        track_user_activity(username, "product_order", {"product": product["name"], "total": total_price})
+        await save_state()
+        return {"success": True, "order": order, "new_balance": user["balance"], "message": f"✅ {product['name']} xarid qilindi!"}
+
+@app.post("/api/v2/ecommerce/recommendations")
+async def get_ai_product_recommendations(req: AIRecommendationRequest):
+    async with db_lock:
+        if req.username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        user = db_state["users"][req.username]
+        messages = [
+            {"role": "system", "content": "Siz BioEmpire tizimining AI marketing mutaxassisisiz. Foydalanuvchi holatiga qarab 3 ta mahsulot tavsiya qiling."},
+            {"role": "user", "content": f"Foydalanuvchi: {req.username}. Holati: {user['status']}. Salomatlik: {user['health_score']}%. Balans: {user['balance']} {user['currency']}."}
+        ]
+        ai_response = await call_ai_api(messages)
+        if not ai_response:
+            ai_response = "Sizga NeuroRegen X1, ImmunoBoost Pro va CardioSync Elite tavsiya qilamiz."
+        return {"recommendations": ai_response}
+
+# ==========================================
+# 13. TURNIRLAR
+# ==========================================
+@app.get("/api/v2/tournaments")
+async def get_tournaments():
+    async with db_lock:
+        return db_state["tournaments"]
+
+@app.post("/api/v2/tournaments/create")
+async def create_tournament(request: Request):
+    async with db_lock:
+        data = await request.json()
+        tournament = {
+            "id": f"tournament_{random.randint(1000, 9999)}",
+            "name": data.get("name", "Bio Turnir"),
+            "description": data.get("description", "Sog'lik musobaqasi"),
+            "start_date": data.get("start_date", datetime.now().isoformat()),
+            "end_date": data.get("end_date", (datetime.now() + timedelta(days=7)).isoformat()),
+            "status": "active",
+            "participants": [],
+            "scores": {}
+        }
+        db_state["tournaments"].append(tournament)
+        await save_state()
+        return tournament
+
+@app.post("/api/v2/tournaments/join")
+async def join_tournament(req: TournamentJoin):
+    async with db_lock:
+        if req.username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        for t in db_state["tournaments"]:
+            if t["id"] == req.tournament_id:
+                if req.username not in t["participants"]:
+                    t["participants"].append(req.username)
+                    t["scores"][req.username] = 0
+                    await save_state()
+                    return {"success": True, "message": f"{req.username} qo'shildi!"}
+                return {"success": False, "message": "Siz allaqachon bu turnirdasiz."}
+        raise HTTPException(status_code=404, detail="Turnir topilmadi.")
+
+@app.post("/api/v2/tournaments/score")
+async def update_tournament_score(req: TournamentScore):
+    async with db_lock:
+        if req.username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        for t in db_state["tournaments"]:
+            if t["id"] == req.tournament_id:
+                if req.username not in t["participants"]:
+                    return {"success": False, "message": "Siz bu turnirda emassiz."}
+                t["scores"][req.username] += req.score
+                await save_state()
+                await manager.broadcast({"type": "tournament_update", "tournament_id": req.tournament_id, "scores": t["scores"]})
+                return {"success": True, "new_score": t["scores"][req.username]}
+        raise HTTPException(status_code=404, detail="Turnir topilmadi.")
+
+@app.get("/api/v2/tournaments/{tournament_id}/leaderboard")
+async def get_tournament_leaderboard(tournament_id: str):
+    async with db_lock:
+        for t in db_state["tournaments"]:
+            if t["id"] == tournament_id:
+                sorted_scores = sorted(t["scores"].items(), key=lambda x: x[1], reverse=True)
+                return {"tournament": t["name"], "leaderboard": sorted_scores}
+        raise HTTPException(status_code=404, detail="Turnir topilmadi.")
+
+@app.get("/api/v2/tournaments/{tournament_id}/predict")
+async def predict_tournament_winner(tournament_id: str):
+    async with db_lock:
+        for t in db_state["tournaments"]:
+            if t["id"] == tournament_id:
+                if not t["scores"]:
+                    return {"prediction": "Hozircha ma'lumot yetarli emas."}
+                messages = [
+                    {"role": "system", "content": "Siz BioEmpire tizimining AI prognoz mutaxassisisiz. Turnir natijalarini tahlil qiling va g'olibni bashorat qiling."},
+                    {"role": "user", "content": f"Turnir: {t['name']}. Natijalar: {json.dumps(t['scores'])}. Kim g'olib bo'lishi mumkin?"}
+                ]
+                ai_response = await call_ai_api(messages)
+                if not ai_response:
+                    sorted_scores = sorted(t["scores"].items(), key=lambda x: x[1], reverse=True)
+                    if sorted_scores:
+                        ai_response = f"🏆 G'olib: {sorted_scores[0][0]} ({sorted_scores[0][1]} ball)"
+                    else:
+                        ai_response = "Hozircha g'olib aniqlanmadi."
+                return {"prediction": ai_response}
+        raise HTTPException(status_code=404, detail="Turnir topilmadi.")
+
+# ==========================================
+# 14. KRIPTO, EMAIL, VIRTUAL DOCTOR
+# ==========================================
+@app.post("/api/v2/crypto/connect")
+async def connect_crypto_wallet(req: CryptoConnect):
+    async with db_lock:
+        if req.username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        db_state["crypto_wallets"][req.username] = req.wallet_address
+        await save_state()
+        return {"success": True, "message": f"Kripto hamyon ulandi: {req.wallet_address[:10]}..."}
+
+@app.post("/api/v2/crypto/pay")
+async def crypto_pay(req: CryptoPay):
+    async with db_lock:
+        if req.username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        user = db_state["users"][req.username]
+        wallet = db_state["crypto_wallets"].get(req.username)
+        if not wallet:
+            return {"success": False, "message": "Kripto hamyon ulanishi kerak."}
+
+        amount_usd = req.amount
+        rate = EXCHANGE_RATES.get(req.currency, 1.0)
+        amount_converted = amount_usd * rate
+
+        if user["balance"] < amount_converted:
+            return {"success": False, "message": "Balans yetarli emas!"}
+
+        user["balance"] -= amount_converted
+        db_state["system_vault"]["total_revenue"] += amount_converted
+        track_user_activity(req.username, "crypto_pay", {"amount": amount_usd, "currency": req.currency})
+        await save_state()
+        return {"success": True, "message": f"✅ {amount_usd} USD to'lov amalga oshirildi.", "new_balance": user["balance"]}
+
+@app.post("/api/v2/email/report")
+async def send_email_report(req: EmailReport):
+    async with db_lock:
+        if req.username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        print(f"📧 EMAIL REPORT to {req.email}")
+        track_user_activity(req.username, "email_report", {"email": req.email})
+        await save_state()
+        return {"success": True, "message": f"✅ Hisobot {req.email} manziliga yuborildi."}
+
+@app.post("/api/v2/virtual-doctor")
+async def virtual_doctor(req: VirtualDoctorRequest):
+    async with db_lock:
+        if req.username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        user = db_state["users"][req.username]
+        currency = user["currency"]
+        rate = EXCHANGE_RATES[currency]
+
+        consultation_price = 200.0 * rate
+        if user["balance"] < consultation_price:
+            return {"success": False, "message": f"⚠️ Balans yetarli emas! ${consultation_price:.2f} kerak."}
+
+        user["balance"] -= consultation_price
+        db_state["system_vault"]["total_revenue"] += consultation_price
+        track_user_activity(req.username, "virtual_doctor", {"symptoms": req.symptoms[:50]})
+
+        messages = [
+            {"role": "system", "content": "Siz BioEmpire tizimining virtual shifokorisiz. Simptomlarni tahlil qiling va tashxis hamda retsept bering."},
+            {"role": "user", "content": f"Simptomlar: {req.symptoms}. Foydalanuvchi holati: {user['status']}, salomatlik: {user['health_score']}%."}
+        ]
+        ai_response = await call_ai_api(messages)
+        if not ai_response:
+            diseases = ["Virusli infeksiya", "Bakterial infeksiya", "Neyron disfunksiya", "Immun tizim zaifligi"]
+            treatments = ["1 haftalik davo", "1 oylik paket", "Qizil zona tekshiruvi"]
+            medicines = ["NeuroRegen X1", "ImmunoBoost Pro", "CardioSync Elite"]
+            diagnosis = f"🩺 [VIRTUAL DOCTOR]: {random.choice(diseases)} aniqlangan. Sizga {random.choice(treatments)} tavsiya etiladi."
+            prescription = f"💊 Retsept: {random.choice(medicines)} - kuniga 2 marta."
+        else:
+            parts = ai_response.split('\n')
+            diagnosis = parts[0] if parts else "Tashxis qo'yildi."
+            prescription = parts[1] if len(parts) > 1 else "Retsept yozildi."
+
+        await save_state()
+        return {"success": True, "diagnosis": diagnosis, "prescription": prescription, "new_balance": user["balance"]}
+
+# ==========================================
+# 15. ADMIN, STATS, NOTIFICATIONS, AI LOGS
+# ==========================================
 @app.get("/api/v2/system/stats")
-async def system_stats():
-    return {
-        "total_revenue": db["system_vault"]["total_revenue"],
-        "active_users": db["system_vault"]["active_users"],
-        "total_sales": len(db.get("product_sales", [])),
-        "total_social_posts": len(db.get("social_posts", []))
-    }
+async def get_system_stats():
+    async with db_lock:
+        return {
+            "total_revenue": db_state["system_vault"]["total_revenue"],
+            "active_users": db_state["system_vault"]["active_users"],
+            "total_feed_posts": len(db_state["feed"]),
+            "total_social_posts": len(db_state["social_posts"]),
+            "total_notifications": len(db_state["notifications"]),
+            "total_sales": len(db_state["product_sales"]),
+            "total_tournaments": len(db_state["tournaments"]),
+            "active_campaigns": len([c for c in db_state["marketing_campaigns"] if c.get("active", False)])
+        }
 
-# ===== ADS =====
+@app.get("/api/v2/admin/users")
+async def get_all_users():
+    async with db_lock:
+        users = []
+        for username, user in db_state["users"].items():
+            users.append({
+                "username": username,
+                "email": user["email"],
+                "balance": user["balance"],
+                "status": user["status"],
+                "health_score": user["health_score"],
+                "packages": len(user.get("packages", [])),
+                "registered_at": user.get("registered_at", "Noma'lum")
+            })
+        return users
+
+@app.get("/api/v2/admin/activity/{username}")
+async def get_user_activity(username: str):
+    async with db_lock:
+        if username not in db_state["user_activity"]:
+            return {"actions": []}
+        return db_state["user_activity"][username]
+
+@app.get("/api/v2/notifications/{username}")
+async def get_notifications(username: str):
+    async with db_lock:
+        if username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        return [n for n in db_state["notifications"] if n["username"] == username][:20]
+
+@app.post("/api/v2/notifications/read/{username}")
+async def mark_notifications_read(username: str):
+    async with db_lock:
+        if username not in db_state["users"]:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        for n in db_state["notifications"]:
+            if n["username"] == username:
+                n["read"] = True
+        await save_state()
+        return {"success": True}
+
+@app.get("/api/v2/ai/logs")
+async def get_ai_logs(limit: int = 50):
+    async with db_lock:
+        return db_state["ai_logs"][-limit:]
+
+@app.get("/api/v2/ai/decisions")
+async def get_ai_decisions(limit: int = 20):
+    async with db_lock:
+        return db_state["ai_decisions"][-limit:]
+
+@app.get("/api/v2/ai/insights")
+async def get_ai_insights(limit: int = 20):
+    async with db_lock:
+        return db_state["ai_insights"][-limit:]
+
 @app.get("/api/v2/ai/ads-performance")
-async def ads_performance():
-    return db.get("ads_performance", {})
-
-# ===== ADMIN =====
-ADMIN_USERNAME = "CEO"
-ADMIN_PASSWORD_HASH = hash_password("12345678")
-
-@app.post("/api/v2/admin/login")
-async def admin_login(request: Request):
-    data = await request.json()
-    if data.get("username") == ADMIN_USERNAME and hash_password(data.get("password", "")) == ADMIN_PASSWORD_HASH:
-        return {"success": True, "token": "admin-token"}
-    raise HTTPException(401, "Noto'g'ri admin ma'lumotlari")
-
-@app.get("/api/v2/admin/dashboard")
-async def admin_dashboard(username: str = None, password: str = None):
-    if username != ADMIN_USERNAME or hash_password(password or "") != ADMIN_PASSWORD_HASH:
-        raise HTTPException(401, "Avtorizatsiya kerak")
-    return {
-        "total_users": len(db["users"]),
-        "total_revenue": db["system_vault"]["total_revenue"],
-        "active_users": db["system_vault"]["active_users"],
-        "total_sales": len(db.get("product_sales", []))
-    }
+async def get_ads_performance():
+    async with db_lock:
+        return db_state["ads_performance"]
 
 # ==========================================
-# HTML (TO'LIQ INTERFEYS)
+# 16. WEBSOCKET
 # ==========================================
-HTML = """<!DOCTYPE html>
-<html lang="uz">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧬 BioEmpire V9.8</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { background: #E8F5E9; font-family: 'Segoe UI', system-ui, sans-serif; margin:0; }
-        .glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); border: 1px solid rgba(102,187,106,0.3); border-radius: 20px; box-shadow: 0 8px 32px rgba(0,40,0,0.08); padding:20px; }
-        .btn-cyber { background: linear-gradient(135deg, #66BB6A, #43A047); border: none; color: white; padding: 10px 24px; border-radius: 12px; cursor: pointer; font-weight: 700; transition: 0.25s; }
-        .btn-cyber:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(102,187,106,0.35); }
-        .btn-gold { background: linear-gradient(135deg, #FFB300, #F9A825); color: #1B3A1B; }
-        .btn-red { background: linear-gradient(135deg, #E53935, #C62828); color: white; }
-        .chat-msg { margin-bottom: 8px; padding: 6px 14px; border-radius: 12px; max-width: 90%; }
-        .chat-msg.ai { background: rgba(102,187,106,0.08); border-left: 3px solid #66BB6A; }
-        .chat-msg.user { background: rgba(255,179,0,0.08); border-right: 3px solid #FFB300; text-align: right; margin-left: auto; }
-        #auth-gate { position: fixed; inset: 0; background: rgba(232,245,233,0.97); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; z-index: 99999; }
-        .auth-card { background: white; border: 2px solid #66BB6A; border-radius: 28px; padding: 44px 36px; width: 100%; max-width: 440px; }
-        .auth-tabs { display: flex; gap: 8px; justify-content: center; margin: 18px 0 22px; }
-        .auth-tab { padding: 6px 28px; border-radius: 30px; cursor: pointer; border: 2px solid transparent; font-weight: 700; color: #4A6A4A; }
-        .auth-tab.active { border-color: #66BB6A; color: #43A047; background: rgba(102,187,106,0.08); }
-        .input-group { margin-bottom: 16px; }
-        .input-group label { display: block; font-size: 12px; font-weight: 700; color: #43A047; margin-bottom: 4px; }
-        .input-group input, .input-group select { width: 100%; background: #f5faf5; border: 1.5px solid rgba(102,187,106,0.3); padding: 10px 14px; color: #1B3A1B; border-radius: 12px; outline: none; }
-        .input-group input:focus { border-color: #66BB6A; box-shadow: 0 0 0 4px rgba(102,187,106,0.1); }
-        .sidebar { width: 250px; flex-shrink: 0; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border-right: 1px solid rgba(102,187,106,0.3); height: calc(100vh - 68px); overflow-y: auto; padding: 16px 12px; position: sticky; top: 68px; }
-        .sidebar-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; background: transparent; border: 1px solid transparent; border-radius: 14px; color: #4A6A4A; cursor: pointer; transition: 0.2s; }
-        .sidebar-btn:hover { background: rgba(102,187,106,0.06); border-color: rgba(102,187,106,0.3); }
-        .sidebar-btn.active { background: rgba(102,187,106,0.1); border-color: #66BB6A; color: #43A047; font-weight: 600; }
-        .panel { display: none; animation: fadeSlide 0.3s ease; }
-        .panel.active { display: block; }
-        @keyframes fadeSlide { 0%{opacity:0;transform:translateY(10px);} 100%{opacity:1;transform:translateY(0);} }
-        .chat-terminal { height: 200px; background: #f9fbf9; border: 1px solid rgba(102,187,106,0.3); border-radius: 14px; padding: 12px 16px; overflow-y: auto; }
-        .feed-item { background: rgba(255,255,255,0.6); border: 1px solid rgba(102,187,106,0.3); padding: 12px 16px; border-radius: 14px; margin-bottom: 10px; border-left: 4px solid #66BB6A; }
-        .feed-item .user { color: #43A047; font-weight: 700; }
-        .feed-item .time { color: #4A6A4A; font-size: 11px; float: right; }
-        .feed-item .actions { margin-top: 8px; display: flex; gap: 16px; font-size: 13px; color: #4A6A4A; cursor: pointer; }
-        .feed-item .actions span:hover { color: #43A047; }
-        .package-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-top: 14px; }
-        .package-card { background: white; border: 1px solid rgba(255,179,0,0.15); border-radius: 14px; padding: 14px 8px; text-align: center; cursor: pointer; transition: 0.25s; }
-        .package-card:hover { border-color: #FFB300; transform: translateY(-4px); box-shadow: 0 8px 24px rgba(255,179,0,0.08); }
-        .package-card .pkg-name { font-size: 12px; font-weight: 700; }
-        .package-card .pkg-price { color: #FFB300; font-size: 15px; font-weight: 800; }
-        .ranking-item { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid rgba(0,0,0,0.05); }
-        .ranking-item .pos { color: #FFB300; font-weight: 700; width: 30px; }
-        .notif-badge { position: absolute; top: -6px; right: -8px; background: #E53935; color: white; border-radius: 50%; padding: 0 6px; font-size: 10px; font-weight: 800; min-width: 18px; text-align: center; animation: pulse-badge 1.8s infinite; }
-        @keyframes pulse-badge { 0%,100%{transform:scale(1);} 50%{transform:scale(1.15);} }
-        .notif-dropdown { position: absolute; right: 0; top: 42px; width: 300px; max-height: 320px; overflow-y: auto; background: white; border: 1px solid rgba(102,187,106,0.3); border-radius: 16px; padding: 14px; display: none; z-index: 200; }
-        .notif-dropdown.show { display: block; }
-        .notif-item { padding: 8px 10px; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 13px; }
-        .notif-item .time { color: #4A6A4A; font-size: 11px; float: right; }
-        .notif-item.unread { border-left: 3px solid #66BB6A; }
-        #camera-preview { width: 100%; max-height: 240px; border-radius: 16px; background: #000; object-fit: cover; border: 2px solid rgba(102,187,106,0.3); }
-        .voice-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #66BB6A; margin-right: 6px; animation: pulse-dot 1s infinite; }
-        @keyframes pulse-dot { 0%,100%{opacity:0.4;transform:scale(0.9);} 50%{opacity:1;transform:scale(1.2);} }
-        .avatar-lg { width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, #C8E6C9, #66BB6A); display: flex; align-items: center; justify-content: center; font-size: 28px; border: 2px solid #FFB300; flex-shrink: 0; }
-        @media (max-width:1024px) { .sidebar { width: 70px !important; padding: 10px 6px; } .sidebar .btn-text { display: none; } .sidebar .icon { font-size: 24px; width: 100%; text-align: center; } }
-        @media (max-width:768px) { .sidebar { display: none; } }
-        .status-badge { display: inline-block; padding: 2px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-        .status-warning { background: #FFB300; color: #1B3A1B; }
-        .status-red { background: #E53935; color: white; }
-        .status-optimized { background: #66BB6A; color: white; }
-        .status-immortal { background: #FFB300; color: #1B3A1B; }
-    </style>
-</head>
-<body>
+@app.websocket("/ws/notifications")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
-<!-- AUTH -->
-<div id="auth-gate">
-    <div class="auth-card">
-        <div class="text-center mb-3"><span class="text-5xl animate-pulse">🧬</span></div>
-        <h2 id="auth-title" style="text-align:center;color:#1B3A1B;font-weight:800;">🔐 TIZIMGA ULANISH</h2>
-        <div class="auth-tabs">
-            <span id="tab-signup" class="auth-tab active" onclick="switchAuth('signup')">Ro'yxatdan o'tish</span>
-            <span id="tab-signin" class="auth-tab" onclick="switchAuth('signin')">Kirish</span>
-        </div>
-        <div id="email-group" class="input-group">
-            <label>📧 E-mail</label>
-            <input type="email" id="auth-email" placeholder="your@email.com" />
-        </div>
-        <div class="input-group">
-            <label>👤 Username</label>
-            <input type="text" id="auth-user" placeholder="Bio_User" />
-        </div>
-        <div class="input-group">
-            <label>🔑 Parol</label>
-            <input type="password" id="auth-pass" placeholder="••••••••" />
-        </div>
-        <div id="currency-group" class="input-group">
-            <label>💱 Valyuta</label>
-            <select id="auth-curr">
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="BTC">BTC</option>
-                <option value="SOL">SOL</option>
-            </select>
-        </div>
-        <button class="btn-cyber w-full" onclick="executeAuth()">🚀 TIZIMNI FAOLASHTIRISH</button>
-        <p id="auth-error" class="text-red-500 text-xs mt-3 text-center"></p>
-        <div class="text-center mt-3 text-xs text-gray-500">Admin: CEO / parol: 12345678</div>
-    </div>
-</div>
+# ==========================================
+# 17. ROOT – Frontend
+# ==========================================
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    try:
+        with open("templates/index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return HTMLResponse("<h1 style='color: red;'>templates/index.html topilmadi!</h1>", status_code=404)
 
-<!-- DASHBOARD -->
-<div id="main-dashboard" style="display:none;">
-    <header class="fixed top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-[#66BB6A33] px-4 py-2 flex items-center justify-between">
-        <div class="flex items-center gap-3 cursor-pointer" onclick="location.reload()">
-            <span class="text-3xl">🧬</span>
-            <span class="text-xl font-black text-[#2E7D32]">BioEmpire ∞</span>
-        </div>
-        <div class="flex items-center gap-4">
-            <div class="notif-bell relative" onclick="toggleNotifications()">
-                🔔 <span class="notif-badge" id="notif-count">0</span>
-                <div class="notif-dropdown" id="notif-dropdown">
-                    <div class="font-bold text-[#43A047] text-xs mb-2">📬 Bildirishnomalar</div>
-                    <div id="notif-list"></div>
-                </div>
-            </div>
-            <span id="header-user" class="text-xs text-[#43A047] hidden"></span>
-            <button id="logout-btn" class="btn-red btn-sm hidden" onclick="logout()">Chiqish</button>
-        </div>
-    </header>
+# ==========================================
+# 18. STARTUP – Barcha AI tasklarni ishga tushirish
+# ==========================================
+@app.on_event("startup")
+async def startup_event():
+    # 4 ta avtonom AI task
+    asyncio.create_task(ai_self_learning_task())
+    asyncio.create_task(ai_autonomous_marketing_task())
+    asyncio.create_task(ai_ads_optimizer_task())
+    asyncio.create_task(ai_decision_maker_task())
 
-    <div class="flex pt-[68px]">
-        <!-- SIDEBAR -->
-        <aside class="sidebar" id="main-sidebar">
-            <div class="flex items-center gap-3 p-3 rounded-xl bg-[#F1F8E9] border border-[#66BB6A33] mb-4">
-                <div class="avatar-lg" id="sidebar-avatar">🧬</div>
-                <div class="flex-1 min-w-0">
-                    <div class="font-bold text-sm text-[#1B3A1B] truncate" id="sidebar-username">-</div>
-                    <div class="text-xs text-gray-500" id="sidebar-status">WARNING</div>
-                </div>
-                <div class="text-right">
-                    <div class="text-[10px] text-gray-400">Balans</div>
-                    <div class="text-sm font-bold text-[#43A047]" id="sidebar-balance">0.00</div>
-                </div>
-            </div>
-            <button class="sidebar-btn active" data-panel="panel-consult" onclick="switchPanel('panel-consult', this)"><span class="icon">🩺</span><span class="btn-text">Konsultatsiya</span></button>
-            <button class="sidebar-btn" data-panel="panel-social" onclick="switchPanel('panel-social', this)"><span class="icon">📡</span><span class="btn-text">Ijtimoiy</span><span class="badge" id="feed-badge">0</span></button>
-            <button class="sidebar-btn" data-panel="panel-profile" onclick="switchPanel('panel-profile', this)"><span class="icon">👤</span><span class="btn-text">Profil</span></button>
-            <button class="sidebar-btn" data-panel="panel-packages" onclick="switchPanel('panel-packages', this)"><span class="icon">📦</span><span class="btn-text">Paketlar</span></button>
-            <button class="sidebar-btn" data-panel="panel-stats" onclick="switchPanel('panel-stats', this)"><span class="icon">📊</span><span class="btn-text">Statistika</span></button>
-            <button class="sidebar-btn" data-panel="panel-ads" onclick="switchPanel('panel-ads', this)"><span class="icon">📈</span><span class="btn-text">AI ADS</span></button>
-            <button class="sidebar-btn" data-panel="panel-admin" onclick="switchPanel('panel-admin', this)"><span class="icon">⚙️</span><span class="btn-text">Admin</span></button>
-        </aside>
+    # Eski post generator
+    async def old_poster():
+        while True:
+            await asyncio.sleep(45)
+            async with db_lock:
+                if not db_state["users"]:
+                    continue
+                username = random.choice(list(db_state["users"].keys()))
+                texts = [
+                    f"🧬 {username} davolanishimdan so'ng o'zimni butunlay yangi odamdek his qilyapman!",
+                    f"⚡ {username} BioEmpire tizimida davolanishdan oldin har kuni og'riq bilan uyg'onardim.",
+                    f"🧫 {username} 3 oylik davolanishdan so'ng, shifokorlar hayratda!",
+                    f"🛡 {username} endi hech qanday kasallikdan qo'rqmayman.",
+                    f"🌟 {username} atrofimdagi odamlar o'zgarishimni payqab qolishdi.",
+                    f"🧠 {username} neyro-sinapslarim optimallashtirilganidan so'ng, ishlash samaradorligim 3 barobar oshdi."
+                ]
+                post_text = random.choice(texts)
+                post = generate_social_post(username, post_text, is_ai=False)
+                post["likes"] = random.randint(10, 80)
+                add_social_post(post)
+                notif = generate_notification(username, f"Yangi post: {post_text[:50]}...", "social")
+                add_notification(notif)
+                await save_state()
+                await manager.broadcast({"type": "new_post", "post": post})
+    asyncio.create_task(old_poster())
 
-        <!-- CONTENT -->
-        <main class="flex-1 min-w-0 p-4 max-w-full">
-            <!-- PANEL: Konsultatsiya -->
-            <div id="panel-consult" class="panel active">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">🩺 AI KONSULTATSIYA</h2>
-                    <div class="mb-4">
-                        <div class="flex gap-2 flex-wrap">
-                            <button class="btn-cyber btn-sm" onclick="startCamera()">📷 Kamerani yoqish</button>
-                            <button class="btn-gold btn-sm" onclick="captureAndAnalyze()">🔬 Suratga olib tahlil</button>
-                            <button class="btn-red btn-sm" onclick="stopCamera()">⏹ To'xtatish</button>
-                        </div>
-                        <video id="camera-preview" autoplay playsinline style="display:none;"></video>
-                        <div id="camera-placeholder" class="bg-gray-100 rounded-xl p-4 text-center text-gray-400 text-sm border border-dashed border-[#66BB6A33]">Kamera o'chirilgan</div>
-                        <div id="camera-result" class="mt-2 text-sm text-[#43A047]"></div>
-                    </div>
-                    <div class="mb-4">
-                        <button class="btn-cyber btn-sm" onclick="startVoice()">🎤 Ovoz bilan gapirish</button>
-                        <button class="btn-red btn-sm" onclick="stopVoice()">⏹ To'xtatish</button>
-                        <span id="voice-status" class="text-sm text-gray-500"></span>
-                        <div id="voice-transcript" class="mt-2 p-3 bg-gray-50 rounded-xl text-sm text-gray-700 min-h-[48px] border border-[#66BB6A33]">Ovoz matni...</div>
-                    </div>
-                    <div>
-                        <div class="chat-terminal" id="consult-chat">
-                            <div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing yoki gapiring.</div>
-                        </div>
-                        <div class="flex gap-2 mt-3">
-                            <input id="consult-input" type="text" placeholder="Xabar yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" />
-                            <button class="btn-cyber btn-sm" onclick="sendConsult()">Yuborish</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- PANEL: Ijtimoiy -->
-            <div id="panel-social" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">📡 Ijtimoiy tarmoq</h2>
-                    <div class="flex gap-2 mb-4">
-                        <input id="social-input" type="text" placeholder="Holatingiz haqida yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" />
-                        <button class="btn-cyber btn-sm" onclick="createSocialPost()">Yozish</button>
-                    </div>
-                    <div id="social-feed" class="max-h-[520px] overflow-y-auto"></div>
-                </div>
-            </div>
-
-            <!-- PANEL: Profil -->
-            <div id="panel-profile" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">👤 Profil</h2>
-                    <div id="profile-content"></div>
-                </div>
-            </div>
-
-            <!-- PANEL: Paketlar -->
-            <div id="panel-packages" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#FFB300] mb-3">📦 Paketlar</h2>
-                    <div class="package-grid" id="package-grid"></div>
-                </div>
-            </div>
-
-            <!-- PANEL: Statistika -->
-            <div id="panel-stats" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">📊 Statistika</h2>
-                    <div id="stats-content" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-                    <div class="mt-4"><h3 class="text-sm font-bold text-[#43A047]">🏅 Salomatlik reytingi</h3><div id="health-ranking" class="max-h-[200px] overflow-y-auto"></div></div>
-                </div>
-            </div>
-
-            <!-- PANEL: AI ADS -->
-            <div id="panel-ads" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">📈 AI ADS</h2>
-                    <div id="ads-performance" class="space-y-2 max-h-[500px] overflow-y-auto"></div>
-                    <button class="btn-cyber btn-sm mt-3" onclick="loadAdsPerformance()">🔄 Yangilash</button>
-                </div>
-            </div>
-
-            <!-- PANEL: Admin -->
-            <div id="panel-admin" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#FFB300] mb-3">⚙️ Admin</h2>
-                    <div class="flex gap-2 mb-4">
-                        <input id="admin-user" type="text" placeholder="Admin" value="CEO" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" />
-                        <input id="admin-pass" type="password" placeholder="Parol" value="12345678" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" />
-                        <button class="btn-cyber btn-sm" onclick="adminLogin()">🔐 Kirish</button>
-                    </div>
-                    <div id="admin-content" class="hidden">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" id="admin-stats-grid"></div>
-                        <div id="admin-data" class="mt-3 max-h-[300px] overflow-y-auto text-sm"></div>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
-</div>
-
-<script>
-// ============================================================
-// GLOBAL
-// ============================================================
-let currentUser = null;
-let authMode = 'signup';
-let tokenBalance = 100;
-let notifCount = 0;
-let cameraStream = null;
-let cameraActive = false;
-let recognition = null;
-let voiceActive = false;
-
-// ============================================================
-// AUTH
-// ============================================================
-function switchAuth(mode) {
-    authMode = mode;
-    document.getElementById('auth-title').innerText = mode === 'signup' ? '🔐 RO\'YXATDAN O\'TISH' : '🔐 KIRISH';
-    document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
-    document.getElementById('tab-' + mode).classList.add('active');
-    document.getElementById('email-group').style.display = mode === 'signup' ? 'block' : 'none';
-    document.getElementById('currency-group').style.display = mode === 'signup' ? 'block' : 'none';
-}
-
-async function executeAuth() {
-    const user = document.getElementById('auth-user').value.trim();
-    const pass = document.getElementById('auth-pass').value;
-    const email = document.getElementById('auth-email').value.trim();
-    const curr = document.getElementById('auth-curr').value;
-    const errEl = document.getElementById('auth-error');
-    errEl.innerText = '';
-
-    if (!user) { errEl.innerText = "Username kiritilmagan!"; return; }
-    if (!pass || pass.length < 6) { errEl.innerText = "Parol kamida 6 belgi!"; return; }
-    if (authMode === 'signup' && !email) { errEl.innerText = "Email kiritilmagan!"; return; }
-
-    const url = authMode === 'signup' ? '/api/v2/auth/signup' : '/api/v2/auth/signin';
-    const body = authMode === 'signup' ? { username: user, password: pass, email: email, currency: curr } : { username: user, password: pass };
-
-    try {
-        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        const data = await res.json();
-        if (!res.ok) { errEl.innerText = data.detail || "Server xatosi."; return; }
-        if (data.status !== 'success') { errEl.innerText = data.message || "Noma'lum xatolik."; return; }
-
-        currentUser = data.username;
-        document.getElementById('auth-gate').style.display = 'none';
-        document.getElementById('main-dashboard').style.display = 'block';
-        document.getElementById('header-user').innerText = '👤 ' + currentUser;
-        document.getElementById('header-user').className = 'text-xs text-[#43A047] block';
-        document.getElementById('logout-btn').className = 'btn-red btn-sm block';
-
-        loadProfile();
-        loadSocialFeed();
-        loadHealthRanking();
-        loadStats();
-        loadAdsPerformance();
-        renderPackages();
-        setInterval(loadSocialFeed, 8000);
-        setInterval(loadHealthRanking, 15000);
-        setInterval(loadAdsPerformance, 30000);
-    } catch (e) { errEl.innerText = "Tarmoq xatosi: " + e.message; }
-}
-
-function logout() {
-    currentUser = null;
-    document.getElementById('auth-gate').style.display = 'flex';
-    document.getElementById('main-dashboard').style.display = 'none';
-    document.getElementById('header-user').className = 'hidden';
-    document.getElementById('logout-btn').className = 'hidden';
-    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); }
-    if (recognition) { recognition.stop(); }
-    location.reload();
-}
-
-// ============================================================
-// PANEL SWITCH
-// ============================================================
-function switchPanel(panelId, btn) {
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    document.getElementById(panelId).classList.add('active');
-    document.querySelectorAll('.sidebar-btn[data-panel]').forEach(b => b.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-    if (panelId === 'panel-profile') loadProfile();
-    if (panelId === 'panel-social') loadSocialFeed();
-    if (panelId === 'panel-stats') { loadStats(); loadHealthRanking(); }
-    if (panelId === 'panel-ads') loadAdsPerformance();
-    if (panelId === 'panel-packages') renderPackages();
-}
-
-// ============================================================
-// PROFILE
-// ============================================================
-async function loadProfile() {
-    if (!currentUser) return;
-    try {
-        const res = await fetch(`/api/v2/profile/${currentUser}`);
-        const data = await res.json();
-        document.getElementById('sidebar-username').innerText = currentUser;
-        document.getElementById('sidebar-balance').innerText = data.balance.toFixed(2);
-        document.getElementById('sidebar-status').innerText = data.status;
-        document.getElementById('sidebar-avatar').innerText = data.avatar || '🧬';
-
-        const container = document.getElementById('profile-content');
-        const statusClass = data.status === 'WARNING' ? 'status-warning' : data.status === 'RED_ZONE' ? 'status-red' : data.status === 'OPTIMIZED' ? 'status-optimized' : 'status-immortal';
-        container.innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]">
-                    <div class="flex items-center gap-4">
-                        <div class="avatar-lg text-4xl">${data.avatar || '🧬'}</div>
-                        <div><div class="text-xl font-bold">${currentUser}</div><div class="text-sm text-gray-500">${data.email}</div></div>
-                    </div>
-                    <div class="mt-4 space-y-1 text-sm">
-                        <p><span class="text-gray-500">Holat:</span> <span class="status-badge ${statusClass}">${data.status}</span></p>
-                        <p><span class="text-gray-500">Balans:</span> <strong class="text-[#43A047]">${data.balance.toFixed(2)} ${data.currency}</strong></p>
-                        <p><span class="text-gray-500">Salomatlik:</span> <strong class="text-[#43A047]">${data.health_score.toFixed(1)}%</strong></p>
-                        <p><span class="text-gray-500">Bio:</span> ${data.bio || 'Yo\'q'}</p>
-                    </div>
-                </div>
-                <div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]">
-                    <h3 class="text-sm font-bold text-[#43A047]">📊 Statistika</h3>
-                    <div class="mt-3 space-y-1 text-sm">
-                        <p><span class="text-gray-500">Tokenlar:</span> <strong>${tokenBalance}</strong></p>
-                    </div>
-                </div>
-            </div>
-        `;
-    } catch (e) { console.error(e); }
-}
-
-// ============================================================
-// SOCIAL FEED
-// ============================================================
-async function loadSocialFeed() {
-    try {
-        const res = await fetch('/api/v2/social/posts');
-        const posts = await res.json();
-        const container = document.getElementById('social-feed');
-        container.innerHTML = '';
-        document.getElementById('feed-badge').innerText = posts.length;
-        posts.forEach(p => {
-            const div = document.createElement('div');
-            div.className = 'feed-item';
-            div.innerHTML = `
-                <div><span class="user">@${p.username}</span> <span class="time">${p.timestamp}</span></div>
-                <div>${p.content}</div>
-                <div class="actions">
-                    <span onclick="likePost('${p.id}')">❤️ ${p.likes || 0}</span>
-                    <span onclick="commentPost('${p.id}')">💬 ${p.comments ? p.comments.length : 0}</span>
-                </div>
-            `;
-            container.appendChild(div);
-        });
-    } catch (e) {}
-}
-
-async function createSocialPost() {
-    const input = document.getElementById('social-input');
-    if (!input.value.trim() || !currentUser) return;
-    try {
-        const res = await fetch('/api/v2/social/post', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: currentUser, content: input.value })
-        });
-        if (res.ok) {
-            input.value = '';
-            loadSocialFeed();
-        }
-    } catch (e) { alert('Xatolik: ' + e.message); }
-}
-
-async function likePost(pid) {
-    if (!currentUser) return;
-    try {
-        await fetch('/api/v2/social/like', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: currentUser, post_id: pid })
-        });
-        loadSocialFeed();
-    } catch (e) {}
-}
-
-async function commentPost(pid) {
-    if (!currentUser) return;
-    const comment = prompt('Komment:');
-    if (!comment) return;
-    try {
-        await fetch('/api/v2/social/comment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: currentUser, post_id: pid, comment: comment })
-        });
-        loadSocialFeed();
-    } catch (e) { alert(e.message); }
-}
-
-// ============================================================
-// CONSULTATION
-// ============================================================
-async function sendConsult() {
-    const input = document.getElementById('consult-input');
-    const msg = input.value.trim();
-    if (!msg || !currentUser) return;
-    if (tokenBalance < 3) { alert('Token yetarli emas!'); return; }
-    tokenBalance -= 3;
-    const box = document.getElementById('consult-chat');
-    box.innerHTML += `<div class="chat-msg user">${msg}</div>`;
-    input.value = '';
-    box.scrollTop = box.scrollHeight;
-
-    try {
-        const res = await fetch('/api/v2/ai/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: currentUser, message: msg })
-        });
-        const data = await res.json();
-        if (data.success) {
-            box.innerHTML += `<div class="chat-msg ai">${data.response}</div>`;
-            loadProfile();
-        } else {
-            box.innerHTML += `<div class="chat-msg warning">${data.message}</div>`;
-        }
-    } catch (e) { box.innerHTML += `<div class="chat-msg warning">${e.message}</div>`; }
-    box.scrollTop = box.scrollHeight;
-}
-
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && document.activeElement?.id === 'consult-input') sendConsult();
-    if (e.key === 'Enter' && document.activeElement?.id === 'social-input') createSocialPost();
-});
-
-// Camera
-async function startCamera() {
-    try {
-        const video = document.getElementById('camera-preview');
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        cameraStream = stream;
-        video.srcObject = stream;
-        video.style.display = 'block';
-        document.getElementById('camera-placeholder').style.display = 'none';
-        cameraActive = true;
-    } catch (err) { alert('Kamera yoqish xatosi: ' + err.message); }
-}
-
-function stopCamera() {
-    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
-    document.getElementById('camera-preview').style.display = 'none';
-    document.getElementById('camera-placeholder').style.display = 'block';
-    cameraActive = false;
-}
-
-async function captureAndAnalyze() {
-    if (!currentUser) return;
-    const video = document.getElementById('camera-preview');
-    if (!cameraActive || video.style.display === 'none') { alert('Kamerani yoqing!'); return; }
-    if (tokenBalance < 10) { alert('Token yetarli emas! (10 token)'); return; }
-    tokenBalance -= 10;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    const base64 = canvas.toDataURL('image/jpeg');
-
-    const result = document.getElementById('camera-result');
-    result.innerText = '⏳ Tahlil...';
-    try {
-        const res = await fetch('/api/v2/camera/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: currentUser, department_id: 1, image_data: base64 })
-        });
-        const data = await res.json();
-        if (data.success) { result.innerText = '🔬 ' + data.analysis; loadProfile(); }
-        else { result.innerText = '❌ ' + data.message; }
-    } catch (e) { result.innerText = '❌ ' + e.message; }
-}
-
-// Voice
-function startVoice() {
-    if (!('webkitSpeechRecognition' in window)) { alert('Brauzer ovozni qo‘llab-quvvatlamaydi'); return; }
-    if (voiceActive) { stopVoice(); return; }
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SpeechRecognition();
-    recognition.lang = 'uz-UZ';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.onstart = () => {
-        voiceActive = true;
-        document.getElementById('voice-status').innerHTML = '<span class="voice-indicator"></span> Aytishni boshlang...';
-    };
-    recognition.onresult = (event) => {
-        let final = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) final += event.results[i][0].transcript;
-        }
-        if (final) {
-            document.getElementById('voice-transcript').innerText = final;
-            document.getElementById('consult-input').value = final;
-            sendConsult();
-        }
-    };
-    recognition.onerror = (e) => { console.error(e); stopVoice(); };
-    recognition.start();
-}
-
-function stopVoice() {
-    if (recognition) { recognition.stop(); recognition = null; }
-    voiceActive = false;
-    document.getElementById('voice-status').innerHTML = '';
-}
-
-// ============================================================
-// HEALTH RANKING
-// ============================================================
-async function loadHealthRanking() {
-    try {
-        const res = await fetch('/api/v2/health/ranking');
-        const data = await res.json();
-        const container = document.getElementById('health-ranking');
-        container.innerHTML = '';
-        data.slice(0, 10).forEach((item, idx) => {
-            const div = document.createElement('div');
-            div.className = 'ranking-item';
-            div.innerHTML = `<span class="pos">${idx+1}</span><span>${item.avatar || '🧬'}</span><span class="name">${item.username}</span><span class="score">${item.health_score}%</span>`;
-            container.appendChild(div);
-        });
-    } catch (e) {}
-}
-
-// ============================================================
-// STATS
-// ============================================================
-async function loadStats() {
-    try {
-        const res = await fetch('/api/v2/system/stats');
-        const data = await res.json();
-        const container = document.getElementById('stats-content');
-        container.innerHTML = `
-            <div class="bg-white p-4 rounded-xl text-center shadow"><div class="text-2xl font-bold text-[#43A047]">$${data.total_revenue || 0}</div><div class="text-xs text-gray-500">Daromad</div></div>
-            <div class="bg-white p-4 rounded-xl text-center shadow"><div class="text-2xl font-bold text-[#43A047]">${data.active_users || 0}</div><div class="text-xs text-gray-500">Aktiv</div></div>
-            <div class="bg-white p-4 rounded-xl text-center shadow"><div class="text-2xl font-bold text-[#FFB300]">${data.total_sales || 0}</div><div class="text-xs text-gray-500">Sotuv</div></div>
-            <div class="bg-white p-4 rounded-xl text-center shadow"><div class="text-2xl font-bold text-[#43A047]">${data.total_social_posts || 0}</div><div class="text-xs text-gray-500">Post</div></div>
-        `;
-    } catch (e) {}
-}
-
-// ============================================================
-// ADS
-// ============================================================
-async function loadAdsPerformance() {
-    try {
-        const res = await fetch('/api/v2/ai/ads-performance');
-        const data = await res.json();
-        const container = document.getElementById('ads-performance');
-        container.innerHTML = '<div class="text-gray-400 text-sm">Hozircha kampaniya yo\'q</div>';
-    } catch (e) {}
-}
-
-// ============================================================
-// PACKAGES
-// ============================================================
-function renderPackages() {
-    const container = document.getElementById('package-grid');
-    container.innerHTML = `
-        <div class="package-card"><div class="pkg-name">1 Haftalik</div><div class="pkg-price">$999</div></div>
-        <div class="package-card"><div class="pkg-name">1 Oylik</div><div class="pkg-price">$9,999</div></div>
-        <div class="package-card"><div class="pkg-name">3 Oylik</div><div class="pkg-price">$299,999</div></div>
-        <div class="package-card"><div class="pkg-name">1 Yillik</div><div class="pkg-price">$1,199,999</div></div>
-    `;
-}
-
-// ============================================================
-// ADMIN
-// ============================================================
-async function adminLogin() {
-    const user = document.getElementById('admin-user').value.trim();
-    const pass = document.getElementById('admin-pass').value.trim();
-    if (!user || !pass) { alert('Admin ma\'lumotlarini kiriting!'); return; }
-    try {
-        const res = await fetch('/api/v2/admin/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: user, password: pass })
-        });
-        const data = await res.json();
-        if (data.success) {
-            document.getElementById('admin-content').classList.remove('hidden');
-            adminLoadDashboard();
-        } else { alert('Noto\'g\'ri admin ma\'lumotlari'); }
-    } catch (e) { alert(e.message); }
-}
-
-async function adminLoadDashboard() {
-    try {
-        const res = await fetch(`/api/v2/admin/dashboard?username=CEO&password=12345678`);
-        const data = await res.json();
-        const grid = document.getElementById('admin-stats-grid');
-        grid.innerHTML = `
-            <div class="bg-white p-4 rounded-xl text-center"><div class="text-2xl font-bold">${data.total_users || 0}</div><div class="text-xs text-gray-500">Foydalanuvchilar</div></div>
-            <div class="bg-white p-4 rounded-xl text-center"><div class="text-2xl font-bold text-[#FFB300]">$${data.total_revenue || 0}</div><div class="text-xs text-gray-500">Daromad</div></div>
-        `;
-        document.getElementById('admin-data').innerHTML = `<pre class="text-xs">${JSON.stringify(data, null, 2)}</pre>`;
-    } catch (e) {}
-}
-</script>
-</body>
-</html>
-"""
+    ai_log("🚀 BioEmpire V9 AI ADS tizimi ishga tushirildi", "INFO")
+    ai_log("🧠 AI Self-Learning, Marketing, ADS Optimizer, Decision-Maker faol", "INFO")
+    ai_log("📢 AI mustaqil ravishda reklama kampaniyalarini yaratadi va optimallashtiradi", "INFO")
 
 # ==========================================
 # SERVER
 # ==========================================
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5050))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    print("=" * 70)
+    print("🚀 BIOEMPIRE V9 TO'LIQ AI ADS + MARKETING TIZIMI STARTING ON PORT 5050")
+    print("🧠 AI MUSTAQIL REKLAMA KAMPANIYALARI YARATADI")
+    print("📢 A/B TESTLAR O'TKAZADI VA ENG YAXSHILARINI KUCHAYTIRADI")
+    print("📈 CHEKSIZ AI AVTONOMIYASI")
+    print("=" * 70)
+
+    uvicorn.run("main:app", host="127.0.0.1", port=5050, reload=True)
