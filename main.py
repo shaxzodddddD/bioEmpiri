@@ -42,7 +42,7 @@ app.add_middleware(
 )
 
 # ==========================================
-# DATABASE (faylga saqlash)
+# DATABASE (JSON faylga saqlash)
 # ==========================================
 DB_FILE = "database_log.json"
 db_lock = asyncio.Lock()
@@ -51,31 +51,58 @@ def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 def load_db():
+    """JSON fayldan ma'lumotlarni yuklaydi, mavjud bo'lmasa yangi yaratadi."""
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                # Agar kerakli kalitlar mavjud bo'lmasa, qo'shamiz
+                default = {
+                    "users": {},
+                    "social_posts": [],
+                    "system_vault": {"total_revenue": 0, "active_users": 0},
+                    "notifications": [],
+                    "user_activity": {},
+                    "product_sales": [],
+                    "ads_performance": {}
+                }
+                for key in default:
+                    if key not in data:
+                        data[key] = default[key]
+                return data
         except Exception as e:
-            print(f"DB yuklash xatosi: {e}")
-    return {
-        "users": {},
-        "social_posts": [],
-        "system_vault": {"total_revenue": 0, "active_users": 0},
-        "notifications": [],
-        "user_activity": {},
-        "product_sales": [],
-        "ads_performance": {}
-    }
+            print(f"⚠️ DB yuklash xatosi: {e} – yangi fayl yaratiladi.")
+            return {
+                "users": {},
+                "social_posts": [],
+                "system_vault": {"total_revenue": 0, "active_users": 0},
+                "notifications": [],
+                "user_activity": {},
+                "product_sales": [],
+                "ads_performance": {}
+            }
+    else:
+        return {
+            "users": {},
+            "social_posts": [],
+            "system_vault": {"total_revenue": 0, "active_users": 0},
+            "notifications": [],
+            "user_activity": {},
+            "product_sales": [],
+            "ads_performance": {}
+        }
 
 def save_db(data):
+    """Ma'lumotlarni JSON faylga yozadi."""
     try:
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
         return True
     except Exception as e:
-        print(f"DB saqlash xatosi: {e}")
+        print(f"❌ DB saqlash xatosi: {e}")
         return False
 
+# DB ni yuklaymiz
 db = load_db()
 
 def generate_post_id():
@@ -164,7 +191,7 @@ async def call_ai_api(messages: List[dict]) -> Optional[str]:
 # ENDPOINTLAR
 # ==========================================
 
-# ===== ROOT =====
+# ===== ROOT (HTML interfeys) =====
 @app.get("/", response_class=HTMLResponse)
 @app.head("/", response_class=HTMLResponse)
 async def root():
@@ -174,25 +201,25 @@ async def root():
 @app.post("/api/v2/auth/signup")
 async def signup(user: UserRegister):
     async with db_lock:
-        # 1. Username mavjudligini tekshirish
+        # Username mavjudligini tekshirish
         if user.username in db["users"]:
             raise HTTPException(status_code=400, detail="Bu username allaqachon band.")
         
-        # 2. Email mavjudligini tekshirish
+        # Email mavjudligini tekshirish
         for u in db["users"].values():
             if u.get("email") == user.email:
                 raise HTTPException(status_code=400, detail="Bu email allaqachon ro'yxatdan o'tgan.")
         
-        # 3. Valyutani aniqlash
+        # Valyutani aniqlash
         curr = user.currency.upper()
         if curr not in ["USD", "EUR", "BTC", "SOL"]:
             curr = "USD"
         
-        # 4. Boshlang'ich balans
+        # Boshlang'ich balans
         rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
         initial_balance = 25000.0 * rates.get(curr, 1.0)
         
-        # 5. Foydalanuvchini qo'shish
+        # Foydalanuvchini qo'shish
         db["users"][user.username] = {
             "email": user.email,
             "password_hash": hash_password(user.password),
@@ -207,10 +234,10 @@ async def signup(user: UserRegister):
             "packages": []
         }
         
-        # 6. Aktiv foydalanuvchilar sonini yangilash
+        # Aktiv foydalanuvchilar sonini yangilash
         db["system_vault"]["active_users"] = len(db["users"])
         
-        # 7. Faylga saqlash
+        # Faylga saqlash
         if not save_db(db):
             raise HTTPException(status_code=500, detail="Ma'lumotlarni saqlashda xatolik.")
         
@@ -423,10 +450,9 @@ async def admin_dashboard(username: str = None, password: str = None):
     }
 
 # ==========================================
-# HTML (TO'LIQ INTERFEYS – QISQARTIRILGAN)
+# HTML (TO'LIQ INTERFEYS)
 # ==========================================
-HTML = """
-<!DOCTYPE html>
+HTML = """<!DOCTYPE html>
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
