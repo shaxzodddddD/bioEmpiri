@@ -32,7 +32,7 @@ GEMINI_MODEL = "gemini-1.5-flash"
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-app = FastAPI(title="BioEmpire V9.9")
+app = FastAPI(title="BioEmpire V10.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -55,8 +55,8 @@ def load_db():
         try:
             with open(DB_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
-            pass
+        except Exception as e:
+            print(f"DB yuklash xatosi: {e}")
     return {
         "users": {},
         "social_posts": [],
@@ -73,7 +73,7 @@ def save_db(data):
             json.dump(data, f, indent=4, ensure_ascii=False)
         return True
     except Exception as e:
-        print(f"[DB] Saqlash xatosi: {e}")
+        print(f"DB saqlash xatosi: {e}")
         return False
 
 db = load_db()
@@ -136,7 +136,8 @@ async def call_groq_api(messages: List[dict]) -> Optional[str]:
             if response.status_code == 200:
                 return response.json()["choices"][0]["message"]["content"]
             return None
-    except:
+    except Exception as e:
+        print(f"Groq xatosi: {e}")
         return None
 
 async def call_gemini_api(messages: List[dict]) -> Optional[str]:
@@ -149,7 +150,8 @@ async def call_gemini_api(messages: List[dict]) -> Optional[str]:
         full_prompt = f"{context}\n\nFoydalanuvchi: {user_message}" if context else user_message
         response = await asyncio.to_thread(model.generate_content, full_prompt)
         return response.text if response and response.text else None
-    except:
+    except Exception as e:
+        print(f"Gemini xatosi: {e}")
         return None
 
 async def call_ai_api(messages: List[dict]) -> Optional[str]:
@@ -168,7 +170,7 @@ async def call_ai_api(messages: List[dict]) -> Optional[str]:
 async def root():
     return HTML
 
-# ===== AUTH - RO'YXATDAN O'TISH (TO'LIQ ISHLAYDI) =====
+# ===== AUTH - RO'YXATDAN O'TISH =====
 @app.post("/api/v2/auth/signup")
 async def signup(user: UserRegister):
     async with db_lock:
@@ -219,21 +221,17 @@ async def signup(user: UserRegister):
             "currency": curr
         }
 
-# ===== AUTH - KIRISH (TO'LIQ ISHLAYDI) =====
+# ===== AUTH - KIRISH =====
 @app.post("/api/v2/auth/signin")
 async def signin(user: UserLogin):
     async with db_lock:
-        # 1. Foydalanuvchi mavjudligini tekshirish
         if user.username not in db["users"]:
             raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
         
         target = db["users"][user.username]
-        
-        # 2. Parolni tekshirish
         if target["password_hash"] != hash_password(user.password):
             raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
         
-        # 3. Muvaffaqiyatli javob
         return {
             "status": "success",
             "username": user.username,
@@ -425,25 +423,23 @@ async def admin_dashboard(username: str = None, password: str = None):
     }
 
 # ==========================================
-# HTML (TO'LIQ INTERFEYS)
+# HTML (TO'LIQ INTERFEYS – QISQARTIRILGAN)
 # ==========================================
-HTML = """<!DOCTYPE html>
+HTML = """
+<!DOCTYPE html>
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧬 BioEmpire V9.9</title>
+    <title>🧬 BioEmpire V10.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #E8F5E9; font-family: 'Segoe UI', system-ui, sans-serif; margin:0; }
-        .glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); border: 1px solid rgba(102,187,106,0.3); border-radius: 20px; box-shadow: 0 8px 32px rgba(0,40,0,0.08); padding:20px; }
-        .btn-cyber { background: linear-gradient(135deg, #66BB6A, #43A047); border: none; color: white; padding: 10px 24px; border-radius: 12px; cursor: pointer; font-weight: 700; transition: 0.25s; }
-        .btn-cyber:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(102,187,106,0.35); }
+        .glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); border: 1px solid rgba(102,187,106,0.3); border-radius: 20px; padding:20px; }
+        .btn-cyber { background: linear-gradient(135deg, #66BB6A, #43A047); border: none; color: white; padding: 10px 24px; border-radius: 12px; cursor: pointer; font-weight: 700; }
+        .btn-cyber:hover { transform: translateY(-2px); }
         .btn-gold { background: linear-gradient(135deg, #FFB300, #F9A825); color: #1B3A1B; }
         .btn-red { background: linear-gradient(135deg, #E53935, #C62828); color: white; }
-        .chat-msg { margin-bottom: 8px; padding: 6px 14px; border-radius: 12px; max-width: 90%; }
-        .chat-msg.ai { background: rgba(102,187,106,0.08); border-left: 3px solid #66BB6A; }
-        .chat-msg.user { background: rgba(255,179,0,0.08); border-right: 3px solid #FFB300; text-align: right; margin-left: auto; }
         #auth-gate { position: fixed; inset: 0; background: rgba(232,245,233,0.97); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; z-index: 99999; }
         .auth-card { background: white; border: 2px solid #66BB6A; border-radius: 28px; padding: 44px 36px; width: 100%; max-width: 440px; }
         .auth-tabs { display: flex; gap: 8px; justify-content: center; margin: 18px 0 22px; }
@@ -452,15 +448,18 @@ HTML = """<!DOCTYPE html>
         .input-group { margin-bottom: 16px; }
         .input-group label { display: block; font-size: 12px; font-weight: 700; color: #43A047; margin-bottom: 4px; }
         .input-group input, .input-group select { width: 100%; background: #f5faf5; border: 1.5px solid rgba(102,187,106,0.3); padding: 10px 14px; color: #1B3A1B; border-radius: 12px; outline: none; }
-        .input-group input:focus { border-color: #66BB6A; box-shadow: 0 0 0 4px rgba(102,187,106,0.1); }
-        .sidebar { width: 250px; flex-shrink: 0; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border-right: 1px solid rgba(102,187,106,0.3); height: calc(100vh - 68px); overflow-y: auto; padding: 16px 12px; position: sticky; top: 68px; }
-        .sidebar-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; background: transparent; border: 1px solid transparent; border-radius: 14px; color: #4A6A4A; cursor: pointer; transition: 0.2s; }
-        .sidebar-btn:hover { background: rgba(102,187,106,0.06); border-color: rgba(102,187,106,0.3); }
+        .input-group input:focus { border-color: #66BB6A; }
+        .sidebar { width: 250px; flex-shrink: 0; background: rgba(255,255,255,0.92); border-right: 1px solid rgba(102,187,106,0.3); height: calc(100vh - 68px); overflow-y: auto; padding: 16px 12px; position: sticky; top: 68px; }
+        .sidebar-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; background: transparent; border: 1px solid transparent; border-radius: 14px; color: #4A6A4A; cursor: pointer; }
+        .sidebar-btn:hover { background: rgba(102,187,106,0.06); }
         .sidebar-btn.active { background: rgba(102,187,106,0.1); border-color: #66BB6A; color: #43A047; font-weight: 600; }
         .panel { display: none; animation: fadeSlide 0.3s ease; }
         .panel.active { display: block; }
         @keyframes fadeSlide { 0%{opacity:0;transform:translateY(10px);} 100%{opacity:1;transform:translateY(0);} }
         .chat-terminal { height: 200px; background: #f9fbf9; border: 1px solid rgba(102,187,106,0.3); border-radius: 14px; padding: 12px 16px; overflow-y: auto; }
+        .chat-msg { margin-bottom: 8px; padding: 6px 14px; border-radius: 12px; max-width: 90%; }
+        .chat-msg.ai { background: rgba(102,187,106,0.08); border-left: 3px solid #66BB6A; }
+        .chat-msg.user { background: rgba(255,179,0,0.08); border-right: 3px solid #FFB300; text-align: right; margin-left: auto; }
         .feed-item { background: rgba(255,255,255,0.6); border: 1px solid rgba(102,187,106,0.3); padding: 12px 16px; border-radius: 14px; margin-bottom: 10px; border-left: 4px solid #66BB6A; }
         .feed-item .user { color: #43A047; font-weight: 700; }
         .feed-item .time { color: #4A6A4A; font-size: 11px; float: right; }
@@ -468,7 +467,7 @@ HTML = """<!DOCTYPE html>
         .feed-item .actions span:hover { color: #43A047; }
         .package-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-top: 14px; }
         .package-card { background: white; border: 1px solid rgba(255,179,0,0.15); border-radius: 14px; padding: 14px 8px; text-align: center; cursor: pointer; transition: 0.25s; }
-        .package-card:hover { border-color: #FFB300; transform: translateY(-4px); box-shadow: 0 8px 24px rgba(255,179,0,0.08); }
+        .package-card:hover { border-color: #FFB300; transform: translateY(-4px); }
         .package-card .pkg-name { font-size: 12px; font-weight: 700; }
         .package-card .pkg-price { color: #FFB300; font-size: 15px; font-weight: 800; }
         .ranking-item { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid rgba(0,0,0,0.05); }
@@ -1101,5 +1100,5 @@ async function adminLoadDashboard() {
 # ==========================================
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5050))
-    print(f"🚀 BioEmpire V9.9 ishga tushdi, port: {port}")
+    print(f"🚀 BioEmpire V10.0 ishga tushdi, port: {port}")
     uvicorn.run("main:app", host="0.0.0.0", port=port)
