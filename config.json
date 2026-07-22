@@ -1,11 +1,11 @@
 {
   "ui": {
-    "primary_bg": "#E8F5E9",
-    "cyber_teal": "#66BB6A",
+    "primary_bg": "#06090E",
+    "cyber_teal": "#00FFCC",
     "lime_green": "#ADFF2F",
-    "cyber_red": "#E53935",
-    "gold": "#FFB300",
-    "glow_intensity": 0.5,
+    "cyber_red": "#FF0055",
+    "gold": "#FFD700",
+    "glow_intensity": 0.8,
     "logo_text": "🧬 BioEmpire ∞",
     "logo_icon": "🧬"
   },
@@ -78,10 +78,10 @@
   },
   "chat_price_usd": 49,
   "camera_analysis_price_usd": 150,
-  "auto_learning_interval": 120,
-  "auto_marketing_interval": 120,
-  "auto_ads_optimizer_interval": 60,
-  "auto_decision_interval": 300,
+  "auto_learning_interval": 180,
+  "auto_marketing_interval": 300,
+  "auto_ads_optimizer_interval": 600,
+  "auto_decision_interval": 900,
   "max_ai_history": 50,
   "ai_autonomy": {
     "enabled": true,
@@ -94,19 +94,5 @@
     "ads_budget": 10000,
     "min_campaign_performance": 0.05,
     "ab_test_duration": 2
-  },
-  "admin": {
-    "username": "CEO",
-    "password_hash": "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f"
-  },
-  "legal": {
-    "terms_of_service": "BioEmpire xizmatlaridan foydalanish shartlari...",
-    "privacy_policy": "Shaxsiy ma'lumotlarni himoya qilish siyosati...",
-    "rules": [
-      "Tizimdan faqat shaxsiy maqsadlarda foydalaning.",
-      "Boshqa foydalanuvchilarni haqorat qilmang.",
-      "Soxta ma'lumotlar kiritmang.",
-      "Tizim tomonidan berilgan tavsiyalar faqat maʼlumot uchun, shifokor maslahatini o'rnini bosa olmaydi."
-    ]
   }
 }
