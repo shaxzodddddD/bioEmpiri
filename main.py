@@ -23,16 +23,37 @@ except ImportError:
     GEMINI_AVAILABLE = False
 
 # ==========================================
-# KONFIGURATSIYA
+# KONFIGURATSIYA (config.json ni avtomatik yaratadi)
 # ==========================================
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+CONFIG_FILE = "config.json"
+if not os.path.exists(CONFIG_FILE):
+    default_config = {
+        "api": {
+            "groq_api_key": os.getenv("GROQ_API_KEY", ""),
+            "gemini_api_key": os.getenv("GEMINI_API_KEY", ""),
+            "primary_ai": "gemini",
+            "fallback_ai": "groq"
+        },
+        "exchange_rates": {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075},
+        "chat_price_usd": 49,
+        "camera_analysis_price_usd": 150,
+        "admin": {"username": "CEO", "password_hash": hashlib.sha256("12345678".encode()).hexdigest()}
+    }
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(default_config, f, indent=4)
+    print("✅ config.json yaratildi")
+
+with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+    CONFIG = json.load(f)
+
+GROQ_API_KEY = CONFIG.get("api", {}).get("groq_api_key", os.getenv("GROQ_API_KEY", ""))
+GEMINI_API_KEY = CONFIG.get("api", {}).get("gemini_api_key", os.getenv("GEMINI_API_KEY", ""))
 GEMINI_MODEL = "gemini-1.5-flash"
 
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-app = FastAPI(title="BioEmpire V10.0")
+app = FastAPI(title="BioEmpire V10.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,21 +63,21 @@ app.add_middleware(
 )
 
 # ==========================================
-# DATABASE (JSON faylga saqlash)
+# DATABASE (JSON faylga saqlash, avtomatik yaratadi)
 # ==========================================
 DB_FILE = "database_log.json"
+DB_BACKUP_FILE = "database_log_backup.json"
 db_lock = asyncio.Lock()
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 def load_db():
-    """JSON fayldan ma'lumotlarni yuklaydi, mavjud bo'lmasa yangi yaratadi."""
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                # Agar kerakli kalitlar mavjud bo'lmasa, qo'shamiz
+                # Kerakli kalitlar mavjudligini tekshirish
                 default = {
                     "users": {},
                     "social_posts": [],
@@ -82,6 +103,7 @@ def load_db():
                 "ads_performance": {}
             }
     else:
+        print("⚠️ database_log.json topilmadi, yangi fayl yaratiladi.")
         return {
             "users": {},
             "social_posts": [],
@@ -93,16 +115,17 @@ def load_db():
         }
 
 def save_db(data):
-    """Ma'lumotlarni JSON faylga yozadi."""
     try:
         with open(DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        # Zaxira nusxa
+        with open(DB_BACKUP_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
         return True
     except Exception as e:
         print(f"❌ DB saqlash xatosi: {e}")
         return False
 
-# DB ni yuklaymiz
 db = load_db()
 
 def generate_post_id():
@@ -212,11 +235,11 @@ async def signup(user: UserRegister):
         
         # Valyutani aniqlash
         curr = user.currency.upper()
-        if curr not in ["USD", "EUR", "BTC", "SOL"]:
+        rates = CONFIG.get("exchange_rates", {"USD": 1.0})
+        if curr not in rates:
             curr = "USD"
         
         # Boshlang'ich balans
-        rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
         initial_balance = 25000.0 * rates.get(curr, 1.0)
         
         # Foydalanuvchini qo'shish
@@ -339,9 +362,10 @@ async def ai_chat(req: AIChatRequest):
             raise HTTPException(404, "Foydalanuvchi topilmadi.")
         
         user = db["users"][req.username]
-        chat_price = 49.0
-        rate = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
-        price = chat_price * rate.get(user["currency"], 1.0)
+        chat_price = CONFIG.get("chat_price_usd", 49)
+        rates = CONFIG.get("exchange_rates", {"USD": 1.0})
+        rate = rates.get(user["currency"], 1.0)
+        price = chat_price * rate
         
         if user["balance"] < price:
             return {"success": False, "message": f"⚠️ AI chat uchun ${price:.2f} kerak."}
@@ -368,9 +392,10 @@ async def camera_analyze(req: CameraAnalysisRequest):
             raise HTTPException(404, "Foydalanuvchi topilmadi.")
         
         user = db["users"][req.username]
-        analysis_price = 150.0
-        rate = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
-        price = analysis_price * rate.get(user["currency"], 1.0)
+        analysis_price = CONFIG.get("camera_analysis_price_usd", 150)
+        rates = CONFIG.get("exchange_rates", {"USD": 1.0})
+        rate = rates.get(user["currency"], 1.0)
+        price = analysis_price * rate
         
         if user["balance"] < price:
             return {"success": False, "message": f"⚠️ Kamera analizi uchun ${price:.2f} kerak."}
@@ -428,8 +453,8 @@ async def ads_performance():
     return db.get("ads_performance", {})
 
 # ===== ADMIN =====
-ADMIN_USERNAME = "CEO"
-ADMIN_PASSWORD_HASH = hash_password("12345678")
+ADMIN_USERNAME = CONFIG.get("admin", {}).get("username", "CEO")
+ADMIN_PASSWORD_HASH = CONFIG.get("admin", {}).get("password_hash", hash_password("12345678"))
 
 @app.post("/api/v2/admin/login")
 async def admin_login(request: Request):
@@ -450,252 +475,152 @@ async def admin_dashboard(username: str = None, password: str = None):
     }
 
 # ==========================================
-# HTML (TO'LIQ INTERFEYS)
+# HTML (TO'LIQ INTERFEYS) – QISQARTIRILGAN
 # ==========================================
 HTML = """<!DOCTYPE html>
 <html lang="uz">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧬 BioEmpire V10.0</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { background: #E8F5E9; font-family: 'Segoe UI', system-ui, sans-serif; margin:0; }
-        .glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); border: 1px solid rgba(102,187,106,0.3); border-radius: 20px; padding:20px; }
-        .btn-cyber { background: linear-gradient(135deg, #66BB6A, #43A047); border: none; color: white; padding: 10px 24px; border-radius: 12px; cursor: pointer; font-weight: 700; }
-        .btn-cyber:hover { transform: translateY(-2px); }
-        .btn-gold { background: linear-gradient(135deg, #FFB300, #F9A825); color: #1B3A1B; }
-        .btn-red { background: linear-gradient(135deg, #E53935, #C62828); color: white; }
-        #auth-gate { position: fixed; inset: 0; background: rgba(232,245,233,0.97); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; z-index: 99999; }
-        .auth-card { background: white; border: 2px solid #66BB6A; border-radius: 28px; padding: 44px 36px; width: 100%; max-width: 440px; }
-        .auth-tabs { display: flex; gap: 8px; justify-content: center; margin: 18px 0 22px; }
-        .auth-tab { padding: 6px 28px; border-radius: 30px; cursor: pointer; border: 2px solid transparent; font-weight: 700; color: #4A6A4A; }
-        .auth-tab.active { border-color: #66BB6A; color: #43A047; background: rgba(102,187,106,0.08); }
-        .input-group { margin-bottom: 16px; }
-        .input-group label { display: block; font-size: 12px; font-weight: 700; color: #43A047; margin-bottom: 4px; }
-        .input-group input, .input-group select { width: 100%; background: #f5faf5; border: 1.5px solid rgba(102,187,106,0.3); padding: 10px 14px; color: #1B3A1B; border-radius: 12px; outline: none; }
-        .input-group input:focus { border-color: #66BB6A; }
-        .sidebar { width: 250px; flex-shrink: 0; background: rgba(255,255,255,0.92); border-right: 1px solid rgba(102,187,106,0.3); height: calc(100vh - 68px); overflow-y: auto; padding: 16px 12px; position: sticky; top: 68px; }
-        .sidebar-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; background: transparent; border: 1px solid transparent; border-radius: 14px; color: #4A6A4A; cursor: pointer; }
-        .sidebar-btn:hover { background: rgba(102,187,106,0.06); }
-        .sidebar-btn.active { background: rgba(102,187,106,0.1); border-color: #66BB6A; color: #43A047; font-weight: 600; }
-        .panel { display: none; animation: fadeSlide 0.3s ease; }
-        .panel.active { display: block; }
-        @keyframes fadeSlide { 0%{opacity:0;transform:translateY(10px);} 100%{opacity:1;transform:translateY(0);} }
-        .chat-terminal { height: 200px; background: #f9fbf9; border: 1px solid rgba(102,187,106,0.3); border-radius: 14px; padding: 12px 16px; overflow-y: auto; }
-        .chat-msg { margin-bottom: 8px; padding: 6px 14px; border-radius: 12px; max-width: 90%; }
-        .chat-msg.ai { background: rgba(102,187,106,0.08); border-left: 3px solid #66BB6A; }
-        .chat-msg.user { background: rgba(255,179,0,0.08); border-right: 3px solid #FFB300; text-align: right; margin-left: auto; }
-        .feed-item { background: rgba(255,255,255,0.6); border: 1px solid rgba(102,187,106,0.3); padding: 12px 16px; border-radius: 14px; margin-bottom: 10px; border-left: 4px solid #66BB6A; }
-        .feed-item .user { color: #43A047; font-weight: 700; }
-        .feed-item .time { color: #4A6A4A; font-size: 11px; float: right; }
-        .feed-item .actions { margin-top: 8px; display: flex; gap: 16px; font-size: 13px; color: #4A6A4A; cursor: pointer; }
-        .feed-item .actions span:hover { color: #43A047; }
-        .package-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-top: 14px; }
-        .package-card { background: white; border: 1px solid rgba(255,179,0,0.15); border-radius: 14px; padding: 14px 8px; text-align: center; cursor: pointer; transition: 0.25s; }
-        .package-card:hover { border-color: #FFB300; transform: translateY(-4px); }
-        .package-card .pkg-name { font-size: 12px; font-weight: 700; }
-        .package-card .pkg-price { color: #FFB300; font-size: 15px; font-weight: 800; }
-        .ranking-item { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid rgba(0,0,0,0.05); }
-        .ranking-item .pos { color: #FFB300; font-weight: 700; width: 30px; }
-        .notif-badge { position: absolute; top: -6px; right: -8px; background: #E53935; color: white; border-radius: 50%; padding: 0 6px; font-size: 10px; font-weight: 800; min-width: 18px; text-align: center; animation: pulse-badge 1.8s infinite; }
-        @keyframes pulse-badge { 0%,100%{transform:scale(1);} 50%{transform:scale(1.15);} }
-        .notif-dropdown { position: absolute; right: 0; top: 42px; width: 300px; max-height: 320px; overflow-y: auto; background: white; border: 1px solid rgba(102,187,106,0.3); border-radius: 16px; padding: 14px; display: none; z-index: 200; }
-        .notif-dropdown.show { display: block; }
-        .notif-item { padding: 8px 10px; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 13px; }
-        .notif-item .time { color: #4A6A4A; font-size: 11px; float: right; }
-        .notif-item.unread { border-left: 3px solid #66BB6A; }
-        #camera-preview { width: 100%; max-height: 240px; border-radius: 16px; background: #000; object-fit: cover; border: 2px solid rgba(102,187,106,0.3); }
-        .voice-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #66BB6A; margin-right: 6px; animation: pulse-dot 1s infinite; }
-        @keyframes pulse-dot { 0%,100%{opacity:0.4;transform:scale(0.9);} 50%{opacity:1;transform:scale(1.2);} }
-        .avatar-lg { width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, #C8E6C9, #66BB6A); display: flex; align-items: center; justify-content: center; font-size: 28px; border: 2px solid #FFB300; flex-shrink: 0; }
-        @media (max-width:1024px) { .sidebar { width: 70px !important; padding: 10px 6px; } .sidebar .btn-text { display: none; } .sidebar .icon { font-size: 24px; width: 100%; text-align: center; } }
-        @media (max-width:768px) { .sidebar { display: none; } }
-        .status-badge { display: inline-block; padding: 2px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-        .status-warning { background: #FFB300; color: #1B3A1B; }
-        .status-red { background: #E53935; color: white; }
-        .status-optimized { background: #66BB6A; color: white; }
-        .status-immortal { background: #FFB300; color: #1B3A1B; }
-    </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧬 BioEmpire V10.1</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{background:#E8F5E9;font-family:'Segoe UI',sans-serif;margin:0;}
+.glass{background:rgba(255,255,255,0.85);backdrop-filter:blur(8px);border:1px solid rgba(102,187,106,0.3);border-radius:20px;padding:20px;}
+.btn-cyber{background:linear-gradient(135deg,#66BB6A,#43A047);border:none;color:white;padding:10px 24px;border-radius:12px;cursor:pointer;font-weight:700;}
+.btn-cyber:hover{transform:translateY(-2px);}
+.btn-gold{background:linear-gradient(135deg,#FFB300,#F9A825);color:#1B3A1B;}
+.btn-red{background:linear-gradient(135deg,#E53935,#C62828);color:white;}
+#auth-gate{position:fixed;inset:0;background:rgba(232,245,233,0.97);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:center;z-index:99999;}
+.auth-card{background:white;border:2px solid #66BB6A;border-radius:28px;padding:44px 36px;width:100%;max-width:440px;}
+.auth-tabs{display:flex;gap:8px;justify-content:center;margin:18px 0 22px;}
+.auth-tab{padding:6px 28px;border-radius:30px;cursor:pointer;border:2px solid transparent;font-weight:700;color:#4A6A4A;}
+.auth-tab.active{border-color:#66BB6A;color:#43A047;background:rgba(102,187,106,0.08);}
+.input-group{margin-bottom:16px;}
+.input-group label{display:block;font-size:12px;font-weight:700;color:#43A047;margin-bottom:4px;}
+.input-group input,.input-group select{width:100%;background:#f5faf5;border:1.5px solid rgba(102,187,106,0.3);padding:10px 14px;color:#1B3A1B;border-radius:12px;outline:none;}
+.input-group input:focus{border-color:#66BB6A;}
+.sidebar{width:250px;flex-shrink:0;background:rgba(255,255,255,0.92);border-right:1px solid rgba(102,187,106,0.3);height:calc(100vh - 68px);overflow-y:auto;padding:16px 12px;position:sticky;top:68px;}
+.sidebar-btn{display:flex;align-items:center;gap:12px;width:100%;padding:10px 14px;background:transparent;border:1px solid transparent;border-radius:14px;color:#4A6A4A;cursor:pointer;}
+.sidebar-btn:hover{background:rgba(102,187,106,0.06);}
+.sidebar-btn.active{background:rgba(102,187,106,0.1);border-color:#66BB6A;color:#43A047;font-weight:600;}
+.panel{display:none;animation:fadeSlide 0.3s ease;}
+.panel.active{display:block;}
+@keyframes fadeSlide{0%{opacity:0;transform:translateY(10px);}100%{opacity:1;transform:translateY(0);}}
+.chat-terminal{height:200px;background:#f9fbf9;border:1px solid rgba(102,187,106,0.3);border-radius:14px;padding:12px 16px;overflow-y:auto;}
+.chat-msg{margin-bottom:8px;padding:6px 14px;border-radius:12px;max-width:90%;}
+.chat-msg.ai{background:rgba(102,187,106,0.08);border-left:3px solid #66BB6A;}
+.chat-msg.user{background:rgba(255,179,0,0.08);border-right:3px solid #FFB300;text-align:right;margin-left:auto;}
+.feed-item{background:rgba(255,255,255,0.6);border:1px solid rgba(102,187,106,0.3);padding:12px 16px;border-radius:14px;margin-bottom:10px;border-left:4px solid #66BB6A;}
+.feed-item .user{color:#43A047;font-weight:700;}
+.feed-item .time{color:#4A6A4A;font-size:11px;float:right;}
+.feed-item .actions{margin-top:8px;display:flex;gap:16px;font-size:13px;color:#4A6A4A;cursor:pointer;}
+.feed-item .actions span:hover{color:#43A047;}
+.package-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-top:14px;}
+.package-card{background:white;border:1px solid rgba(255,179,0,0.15);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;transition:0.25s;}
+.package-card:hover{border-color:#FFB300;transform:translateY(-4px);}
+.package-card .pkg-name{font-size:12px;font-weight:700;}
+.package-card .pkg-price{color:#FFB300;font-size:15px;font-weight:800;}
+.ranking-item{display:flex;align-items:center;gap:12px;padding:6px 12px;border-bottom:1px solid rgba(0,0,0,0.05);}
+.ranking-item .pos{color:#FFB300;font-weight:700;width:30px;}
+.notif-badge{position:absolute;top:-6px;right:-8px;background:#E53935;color:white;border-radius:50%;padding:0 6px;font-size:10px;font-weight:800;min-width:18px;text-align:center;animation:pulse-badge 1.8s infinite;}
+@keyframes pulse-badge{0%,100%{transform:scale(1);}50%{transform:scale(1.15);}}
+.notif-dropdown{position:absolute;right:0;top:42px;width:300px;max-height:320px;overflow-y:auto;background:white;border:1px solid rgba(102,187,106,0.3);border-radius:16px;padding:14px;display:none;z-index:200;}
+.notif-dropdown.show{display:block;}
+.notif-item{padding:8px 10px;border-bottom:1px solid rgba(0,0,0,0.05);font-size:13px;}
+.notif-item .time{color:#4A6A4A;font-size:11px;float:right;}
+.notif-item.unread{border-left:3px solid #66BB6A;}
+#camera-preview{width:100%;max-height:240px;border-radius:16px;background:#000;object-fit:cover;border:2px solid rgba(102,187,106,0.3);}
+.voice-indicator{display:inline-block;width:12px;height:12px;border-radius:50%;background:#66BB6A;margin-right:6px;animation:pulse-dot 1s infinite;}
+@keyframes pulse-dot{0%,100%{opacity:0.4;transform:scale(0.9);}50%{opacity:1;transform:scale(1.2);}}
+.avatar-lg{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#C8E6C9,#66BB6A);display:flex;align-items:center;justify-content:center;font-size:28px;border:2px solid #FFB300;flex-shrink:0;}
+@media(max-width:1024px){.sidebar{width:70px !important;padding:10px 6px;}.sidebar .btn-text{display:none;}.sidebar .icon{font-size:24px;width:100%;text-align:center;}}
+@media(max-width:768px){.sidebar{display:none;}}
+.status-badge{display:inline-block;padding:2px 12px;border-radius:20px;font-size:11px;font-weight:700;}
+.status-warning{background:#FFB300;color:#1B3A1B;}
+.status-red{background:#E53935;color:white;}
+.status-optimized{background:#66BB6A;color:white;}
+.status-immortal{background:#FFB300;color:#1B3A1B;}
+</style>
 </head>
 <body>
-
 <!-- AUTH -->
 <div id="auth-gate">
-    <div class="auth-card">
-        <div class="text-center mb-3"><span class="text-5xl animate-pulse">🧬</span></div>
-        <h2 id="auth-title" style="text-align:center;color:#1B3A1B;font-weight:800;">🔐 TIZIMGA ULANISH</h2>
-        <div class="auth-tabs">
-            <span id="tab-signup" class="auth-tab active" onclick="switchAuth('signup')">Ro'yxatdan o'tish</span>
-            <span id="tab-signin" class="auth-tab" onclick="switchAuth('signin')">Kirish</span>
-        </div>
-        <div id="email-group" class="input-group">
-            <label>📧 E-mail</label>
-            <input type="email" id="auth-email" placeholder="your@email.com" />
-        </div>
-        <div class="input-group">
-            <label>👤 Username</label>
-            <input type="text" id="auth-user" placeholder="Bio_User" />
-        </div>
-        <div class="input-group">
-            <label>🔑 Parol</label>
-            <input type="password" id="auth-pass" placeholder="••••••••" />
-        </div>
-        <div id="currency-group" class="input-group">
-            <label>💱 Valyuta</label>
-            <select id="auth-curr">
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="BTC">BTC</option>
-                <option value="SOL">SOL</option>
-            </select>
-        </div>
-        <button class="btn-cyber w-full" onclick="executeAuth()">🚀 TIZIMNI FAOLASHTIRISH</button>
-        <p id="auth-error" class="text-red-500 text-xs mt-3 text-center"></p>
-        <div class="text-center mt-3 text-xs text-gray-500">Admin: CEO / parol: 12345678</div>
-    </div>
+<div class="auth-card">
+<div class="text-center mb-3"><span class="text-5xl animate-pulse">🧬</span></div>
+<h2 id="auth-title" style="text-align:center;color:#1B3A1B;font-weight:800;">🔐 TIZIMGA ULANISH</h2>
+<div class="auth-tabs">
+<span id="tab-signup" class="auth-tab active" onclick="switchAuth('signup')">Ro'yxatdan o'tish</span>
+<span id="tab-signin" class="auth-tab" onclick="switchAuth('signin')">Kirish</span>
+</div>
+<div id="email-group" class="input-group"><label>📧 E-mail</label><input type="email" id="auth-email" placeholder="your@email.com" /></div>
+<div class="input-group"><label>👤 Username</label><input type="text" id="auth-user" placeholder="Bio_User" /></div>
+<div class="input-group"><label>🔑 Parol</label><input type="password" id="auth-pass" placeholder="••••••••" /></div>
+<div id="currency-group" class="input-group"><label>💱 Valyuta</label><select id="auth-curr"><option value="USD">USD</option><option value="EUR">EUR</option><option value="BTC">BTC</option><option value="SOL">SOL</option></select></div>
+<button class="btn-cyber w-full" onclick="executeAuth()">🚀 TIZIMNI FAOLASHTIRISH</button>
+<p id="auth-error" class="text-red-500 text-xs mt-3 text-center"></p>
+<div class="text-center mt-3 text-xs text-gray-500">Admin: CEO / parol: 12345678</div>
+</div>
 </div>
 
 <!-- DASHBOARD -->
 <div id="main-dashboard" style="display:none;">
-    <header class="fixed top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-[#66BB6A33] px-4 py-2 flex items-center justify-between">
-        <div class="flex items-center gap-3 cursor-pointer" onclick="location.reload()">
-            <span class="text-3xl">🧬</span>
-            <span class="text-xl font-black text-[#2E7D32]">BioEmpire ∞</span>
-        </div>
-        <div class="flex items-center gap-4">
-            <div class="notif-bell relative" onclick="toggleNotifications()">
-                🔔 <span class="notif-badge" id="notif-count">0</span>
-                <div class="notif-dropdown" id="notif-dropdown">
-                    <div class="font-bold text-[#43A047] text-xs mb-2">📬 Bildirishnomalar</div>
-                    <div id="notif-list"></div>
-                </div>
-            </div>
-            <span id="header-user" class="text-xs text-[#43A047] hidden"></span>
-            <button id="logout-btn" class="btn-red btn-sm hidden" onclick="logout()">Chiqish</button>
-        </div>
-    </header>
+<header class="fixed top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-[#66BB6A33] px-4 py-2 flex items-center justify-between">
+<div class="flex items-center gap-3 cursor-pointer" onclick="location.reload()"><span class="text-3xl">🧬</span><span class="text-xl font-black text-[#2E7D32]">BioEmpire ∞</span></div>
+<div class="flex items-center gap-4">
+<div class="notif-bell relative" onclick="toggleNotifications()">🔔<span class="notif-badge" id="notif-count">0</span><div class="notif-dropdown" id="notif-dropdown"><div class="font-bold text-[#43A047] text-xs mb-2">📬 Bildirishnomalar</div><div id="notif-list"></div></div></div>
+<span id="header-user" class="text-xs text-[#43A047] hidden"></span>
+<button id="logout-btn" class="btn-red btn-sm hidden" onclick="logout()">Chiqish</button>
+</div>
+</header>
 
-    <div class="flex pt-[68px]">
-        <!-- SIDEBAR -->
-        <aside class="sidebar" id="main-sidebar">
-            <div class="flex items-center gap-3 p-3 rounded-xl bg-[#F1F8E9] border border-[#66BB6A33] mb-4">
-                <div class="avatar-lg" id="sidebar-avatar">🧬</div>
-                <div class="flex-1 min-w-0">
-                    <div class="font-bold text-sm text-[#1B3A1B] truncate" id="sidebar-username">-</div>
-                    <div class="text-xs text-gray-500" id="sidebar-status">WARNING</div>
-                </div>
-                <div class="text-right">
-                    <div class="text-[10px] text-gray-400">Balans</div>
-                    <div class="text-sm font-bold text-[#43A047]" id="sidebar-balance">0.00</div>
-                </div>
-            </div>
-            <button class="sidebar-btn active" data-panel="panel-consult" onclick="switchPanel('panel-consult', this)"><span class="icon">🩺</span><span class="btn-text">Konsultatsiya</span></button>
-            <button class="sidebar-btn" data-panel="panel-social" onclick="switchPanel('panel-social', this)"><span class="icon">📡</span><span class="btn-text">Ijtimoiy</span><span class="badge" id="feed-badge">0</span></button>
-            <button class="sidebar-btn" data-panel="panel-profile" onclick="switchPanel('panel-profile', this)"><span class="icon">👤</span><span class="btn-text">Profil</span></button>
-            <button class="sidebar-btn" data-panel="panel-packages" onclick="switchPanel('panel-packages', this)"><span class="icon">📦</span><span class="btn-text">Paketlar</span></button>
-            <button class="sidebar-btn" data-panel="panel-stats" onclick="switchPanel('panel-stats', this)"><span class="icon">📊</span><span class="btn-text">Statistika</span></button>
-            <button class="sidebar-btn" data-panel="panel-ads" onclick="switchPanel('panel-ads', this)"><span class="icon">📈</span><span class="btn-text">AI ADS</span></button>
-            <button class="sidebar-btn" data-panel="panel-admin" onclick="switchPanel('panel-admin', this)"><span class="icon">⚙️</span><span class="btn-text">Admin</span></button>
-        </aside>
+<div class="flex pt-[68px]">
+<aside class="sidebar" id="main-sidebar">
+<div class="flex items-center gap-3 p-3 rounded-xl bg-[#F1F8E9] border border-[#66BB6A33] mb-4">
+<div class="avatar-lg" id="sidebar-avatar">🧬</div>
+<div class="flex-1 min-w-0"><div class="font-bold text-sm text-[#1B3A1B] truncate" id="sidebar-username">-</div><div class="text-xs text-gray-500" id="sidebar-status">WARNING</div></div>
+<div class="text-right"><div class="text-[10px] text-gray-400">Balans</div><div class="text-sm font-bold text-[#43A047]" id="sidebar-balance">0.00</div></div>
+</div>
+<button class="sidebar-btn active" data-panel="panel-consult" onclick="switchPanel('panel-consult', this)"><span class="icon">🩺</span><span class="btn-text">Konsultatsiya</span></button>
+<button class="sidebar-btn" data-panel="panel-social" onclick="switchPanel('panel-social', this)"><span class="icon">📡</span><span class="btn-text">Ijtimoiy</span><span class="badge" id="feed-badge">0</span></button>
+<button class="sidebar-btn" data-panel="panel-profile" onclick="switchPanel('panel-profile', this)"><span class="icon">👤</span><span class="btn-text">Profil</span></button>
+<button class="sidebar-btn" data-panel="panel-packages" onclick="switchPanel('panel-packages', this)"><span class="icon">📦</span><span class="btn-text">Paketlar</span></button>
+<button class="sidebar-btn" data-panel="panel-stats" onclick="switchPanel('panel-stats', this)"><span class="icon">📊</span><span class="btn-text">Statistika</span></button>
+<button class="sidebar-btn" data-panel="panel-ads" onclick="switchPanel('panel-ads', this)"><span class="icon">📈</span><span class="btn-text">AI ADS</span></button>
+<button class="sidebar-btn" data-panel="panel-admin" onclick="switchPanel('panel-admin', this)"><span class="icon">⚙️</span><span class="btn-text">Admin</span></button>
+</aside>
 
-        <!-- CONTENT -->
-        <main class="flex-1 min-w-0 p-4 max-w-full">
-            <!-- PANEL: Konsultatsiya -->
-            <div id="panel-consult" class="panel active">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">🩺 AI KONSULTATSIYA</h2>
-                    <div class="mb-4">
-                        <div class="flex gap-2 flex-wrap">
-                            <button class="btn-cyber btn-sm" onclick="startCamera()">📷 Kamerani yoqish</button>
-                            <button class="btn-gold btn-sm" onclick="captureAndAnalyze()">🔬 Suratga olib tahlil</button>
-                            <button class="btn-red btn-sm" onclick="stopCamera()">⏹ To'xtatish</button>
-                        </div>
-                        <video id="camera-preview" autoplay playsinline style="display:none;"></video>
-                        <div id="camera-placeholder" class="bg-gray-100 rounded-xl p-4 text-center text-gray-400 text-sm border border-dashed border-[#66BB6A33]">Kamera o'chirilgan</div>
-                        <div id="camera-result" class="mt-2 text-sm text-[#43A047]"></div>
-                    </div>
-                    <div class="mb-4">
-                        <button class="btn-cyber btn-sm" onclick="startVoice()">🎤 Ovoz bilan gapirish</button>
-                        <button class="btn-red btn-sm" onclick="stopVoice()">⏹ To'xtatish</button>
-                        <span id="voice-status" class="text-sm text-gray-500"></span>
-                        <div id="voice-transcript" class="mt-2 p-3 bg-gray-50 rounded-xl text-sm text-gray-700 min-h-[48px] border border-[#66BB6A33]">Ovoz matni...</div>
-                    </div>
-                    <div>
-                        <div class="chat-terminal" id="consult-chat">
-                            <div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing yoki gapiring.</div>
-                        </div>
-                        <div class="flex gap-2 mt-3">
-                            <input id="consult-input" type="text" placeholder="Xabar yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" />
-                            <button class="btn-cyber btn-sm" onclick="sendConsult()">Yuborish</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<main class="flex-1 min-w-0 p-4 max-w-full">
+<!-- Konsultatsiya -->
+<div id="panel-consult" class="panel active">
+<div class="glass">
+<h2 class="text-xl font-bold text-[#43A047] mb-3">🩺 AI KONSULTATSIYA</h2>
+<div class="mb-4"><div class="flex gap-2 flex-wrap"><button class="btn-cyber btn-sm" onclick="startCamera()">📷 Kamerani yoqish</button><button class="btn-gold btn-sm" onclick="captureAndAnalyze()">🔬 Suratga olib tahlil</button><button class="btn-red btn-sm" onclick="stopCamera()">⏹ To'xtatish</button></div>
+<video id="camera-preview" autoplay playsinline style="display:none;"></video><div id="camera-placeholder" class="bg-gray-100 rounded-xl p-4 text-center text-gray-400 text-sm border border-dashed border-[#66BB6A33]">Kamera o'chirilgan</div><div id="camera-result" class="mt-2 text-sm text-[#43A047]"></div></div>
+<div class="mb-4"><button class="btn-cyber btn-sm" onclick="startVoice()">🎤 Ovoz bilan gapirish</button><button class="btn-red btn-sm" onclick="stopVoice()">⏹ To'xtatish</button><span id="voice-status" class="text-sm text-gray-500"></span><div id="voice-transcript" class="mt-2 p-3 bg-gray-50 rounded-xl text-sm text-gray-700 min-h-[48px] border border-[#66BB6A33]">Ovoz matni...</div></div>
+<div><div class="chat-terminal" id="consult-chat"><div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing yoki gapiring.</div></div>
+<div class="flex gap-2 mt-3"><input id="consult-input" type="text" placeholder="Xabar yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" /><button class="btn-cyber btn-sm" onclick="sendConsult()">Yuborish</button></div></div>
+</div>
+</div>
 
-            <!-- PANEL: Ijtimoiy -->
-            <div id="panel-social" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">📡 Ijtimoiy tarmoq</h2>
-                    <div class="flex gap-2 mb-4">
-                        <input id="social-input" type="text" placeholder="Holatingiz haqida yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" />
-                        <button class="btn-cyber btn-sm" onclick="createSocialPost()">Yozish</button>
-                    </div>
-                    <div id="social-feed" class="max-h-[520px] overflow-y-auto"></div>
-                </div>
-            </div>
+<!-- Ijtimoiy -->
+<div id="panel-social" class="panel"><div class="glass"><h2 class="text-xl font-bold text-[#43A047] mb-3">📡 Ijtimoiy tarmoq</h2><div class="flex gap-2 mb-4"><input id="social-input" type="text" placeholder="Holatingiz haqida yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" /><button class="btn-cyber btn-sm" onclick="createSocialPost()">Yozish</button></div><div id="social-feed" class="max-h-[520px] overflow-y-auto"></div></div></div>
 
-            <!-- PANEL: Profil -->
-            <div id="panel-profile" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">👤 Profil</h2>
-                    <div id="profile-content"></div>
-                </div>
-            </div>
+<!-- Profil -->
+<div id="panel-profile" class="panel"><div class="glass"><h2 class="text-xl font-bold text-[#43A047] mb-3">👤 Profil</h2><div id="profile-content"></div></div></div>
 
-            <!-- PANEL: Paketlar -->
-            <div id="panel-packages" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#FFB300] mb-3">📦 Paketlar</h2>
-                    <div class="package-grid" id="package-grid"></div>
-                </div>
-            </div>
+<!-- Paketlar -->
+<div id="panel-packages" class="panel"><div class="glass"><h2 class="text-xl font-bold text-[#FFB300] mb-3">📦 Paketlar</h2><div class="package-grid" id="package-grid"></div></div></div>
 
-            <!-- PANEL: Statistika -->
-            <div id="panel-stats" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">📊 Statistika</h2>
-                    <div id="stats-content" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-                    <div class="mt-4"><h3 class="text-sm font-bold text-[#43A047]">🏅 Salomatlik reytingi</h3><div id="health-ranking" class="max-h-[200px] overflow-y-auto"></div></div>
-                </div>
-            </div>
+<!-- Statistika -->
+<div id="panel-stats" class="panel"><div class="glass"><h2 class="text-xl font-bold text-[#43A047] mb-3">📊 Statistika</h2><div id="stats-content" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div><div class="mt-4"><h3 class="text-sm font-bold text-[#43A047]">🏅 Salomatlik reytingi</h3><div id="health-ranking" class="max-h-[200px] overflow-y-auto"></div></div></div></div>
 
-            <!-- PANEL: AI ADS -->
-            <div id="panel-ads" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">📈 AI ADS</h2>
-                    <div id="ads-performance" class="space-y-2 max-h-[500px] overflow-y-auto"></div>
-                    <button class="btn-cyber btn-sm mt-3" onclick="loadAdsPerformance()">🔄 Yangilash</button>
-                </div>
-            </div>
+<!-- AI ADS -->
+<div id="panel-ads" class="panel"><div class="glass"><h2 class="text-xl font-bold text-[#43A047] mb-3">📈 AI ADS</h2><div id="ads-performance" class="space-y-2 max-h-[500px] overflow-y-auto"></div><button class="btn-cyber btn-sm mt-3" onclick="loadAdsPerformance()">🔄 Yangilash</button></div></div>
 
-            <!-- PANEL: Admin -->
-            <div id="panel-admin" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#FFB300] mb-3">⚙️ Admin</h2>
-                    <div class="flex gap-2 mb-4">
-                        <input id="admin-user" type="text" placeholder="Admin" value="CEO" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" />
-                        <input id="admin-pass" type="password" placeholder="Parol" value="12345678" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" />
-                        <button class="btn-cyber btn-sm" onclick="adminLogin()">🔐 Kirish</button>
-                    </div>
-                    <div id="admin-content" class="hidden">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" id="admin-stats-grid"></div>
-                        <div id="admin-data" class="mt-3 max-h-[300px] overflow-y-auto text-sm"></div>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
+<!-- Admin -->
+<div id="panel-admin" class="panel"><div class="glass"><h2 class="text-xl font-bold text-[#FFB300] mb-3">⚙️ Admin</h2><div class="flex gap-2 mb-4"><input id="admin-user" type="text" placeholder="Admin" value="CEO" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" /><input id="admin-pass" type="password" placeholder="Parol" value="12345678" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" /><button class="btn-cyber btn-sm" onclick="adminLogin()">🔐 Kirish</button></div><div id="admin-content" class="hidden"><div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" id="admin-stats-grid"></div><div id="admin-data" class="mt-3 max-h-[300px] overflow-y-auto text-sm"></div></div></div></div>
+</main>
+</div>
 </div>
 
 <script>
@@ -1126,5 +1051,5 @@ async function adminLoadDashboard() {
 # ==========================================
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5050))
-    print(f"🚀 BioEmpire V10.0 ishga tushdi, port: {port}")
+    print(f"🚀 BioEmpire V10.1 ishga tushdi, port: {port}")
     uvicorn.run("main:app", host="0.0.0.0", port=port)
