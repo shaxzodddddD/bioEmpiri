@@ -4,3 +4,8 @@ pydantic
 httpx
 google-generativeai
 python-multipart
+sqlalchemy
+asyncpg
+aiosqlite
+passlib[bcrypt]
+python-dotenv
