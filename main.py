@@ -32,7 +32,7 @@ GEMINI_MODEL = "gemini-1.5-flash"
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-app = FastAPI(title="BioEmpire V9.9")
+app = FastAPI(title="BioEmpire V10")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,40 +42,53 @@ app.add_middleware(
 )
 
 # ==========================================
-# DATABASE (faylga saqlash)
+# DATABASE (xotira + fayl)
 # ==========================================
 DB_FILE = "database_log.json"
 db_lock = asyncio.Lock()
+
+# Xotirada saqlash
+memory_db = {
+    "users": {},
+    "social_posts": [],
+    "system_vault": {"total_revenue": 0, "active_users": 0},
+    "notifications": [],
+    "user_activity": {},
+    "product_sales": [],
+    "ads_performance": {}
+}
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 def load_db():
+    global memory_db
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            pass
-    return {
-        "users": {},
-        "social_posts": [],
-        "system_vault": {"total_revenue": 0, "active_users": 0},
-        "notifications": [],
-        "user_activity": {},
-        "product_sales": [],
-        "ads_performance": {}
-    }
+                data = json.load(f)
+                # Xotirani yangilash
+                for key in memory_db:
+                    if key in data:
+                        memory_db[key] = data[key]
+                print(f"[DB] Fayldan yuklandi: {len(memory_db['users'])} foydalanuvchi")
+                return memory_db
+        except Exception as e:
+            print(f"[DB] Faylni o'qishda xatolik: {e}")
+    print("[DB] Yangi ma'lumotlar bazasi yaratildi (xotirada)")
+    return memory_db
 
-def save_db(data):
+def save_db():
     try:
         with open(DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
+            json.dump(memory_db, f, indent=4, ensure_ascii=False)
+        print(f"[DB] Saqlandi: {len(memory_db['users'])} foydalanuvchi")
         return True
     except Exception as e:
-        print(f"[DB] Saqlash xatosi: {e}")
+        print(f"[DB] Saqlashda xatolik: {e}")
         return False
 
+# Yuklash
 db = load_db()
 
 def generate_post_id():
@@ -190,7 +203,7 @@ async def signup(user: UserRegister):
         rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
         initial_balance = 25000.0 * rates.get(curr, 1.0)
         
-        # 5. Foydalanuvchini qo'shish
+        # 5. Foydalanuvchini qo'shish (xotiraga)
         db["users"][user.username] = {
             "email": user.email,
             "password_hash": hash_password(user.password),
@@ -208,9 +221,8 @@ async def signup(user: UserRegister):
         # 6. Aktiv foydalanuvchilar sonini yangilash
         db["system_vault"]["active_users"] = len(db["users"])
         
-        # 7. Faylga saqlash
-        if not save_db(db):
-            raise HTTPException(status_code=500, detail="Ma'lumotlarni saqlashda xatolik.")
+        # 7. Faylga saqlash (agar imkoni bo'lsa)
+        save_db()
         
         return {
             "status": "success",
@@ -276,7 +288,7 @@ async def create_post(req: SocialPostRequest):
         db["social_posts"].insert(0, post)
         if len(db["social_posts"]) > 100:
             db["social_posts"] = db["social_posts"][:100]
-        save_db(db)
+        save_db()
         return post
 
 @app.post("/api/v2/social/like")
@@ -285,7 +297,7 @@ async def like(req: LikeRequest):
         for post in db["social_posts"]:
             if post["id"] == req.post_id:
                 post["likes"] = post.get("likes", 0) + 1
-                save_db(db)
+                save_db()
                 return {"success": True, "likes": post["likes"]}
         raise HTTPException(404, "Post topilmadi.")
 
@@ -302,7 +314,7 @@ async def comment(req: CommentRequest):
                 if "comments" not in post:
                     post["comments"] = []
                 post["comments"].append(comment_obj)
-                save_db(db)
+                save_db()
                 return {"success": True, "comment": comment_obj}
         raise HTTPException(404, "Post topilmadi.")
 
@@ -323,7 +335,7 @@ async def ai_chat(req: AIChatRequest):
         
         user["balance"] -= price
         db["system_vault"]["total_revenue"] += price
-        save_db(db)
+        save_db()
         
         messages = [
             {"role": "system", "content": "Siz BioEmpire AI shifokorisiz. Kasalliklar haqida batafsil ma'lumot bering."},
@@ -352,7 +364,7 @@ async def camera_analyze(req: CameraAnalysisRequest):
         
         user["balance"] -= price
         db["system_vault"]["total_revenue"] += price
-        save_db(db)
+        save_db()
         
         analysis_result = "🔬 Rasm tahlili: Teri toshmasi aniqlangan. Dermatologga murojaat qilish tavsiya etiladi."
         
@@ -425,14 +437,14 @@ async def admin_dashboard(username: str = None, password: str = None):
     }
 
 # ==========================================
-# HTML (TO'LIQ INTERFEYS)
+# HTML (TO'LIQ INTERFEYS) – qisqartirilgan
 # ==========================================
 HTML = """<!DOCTYPE html>
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧬 BioEmpire V9.9</title>
+    <title>🧬 BioEmpire V10</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #E8F5E9; font-family: 'Segoe UI', system-ui, sans-serif; margin:0; }
@@ -1101,5 +1113,6 @@ async function adminLoadDashboard() {
 # ==========================================
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5050))
-    print(f"🚀 BioEmpire V9.9 ishga tushdi, port: {port}")
+    print(f"🚀 BioEmpire V10 ishga tushdi, port: {port}")
+    print(f"👥 Foydalanuvchilar soni: {len(db['users'])}")
     uvicorn.run("main:app", host="0.0.0.0", port=port)
