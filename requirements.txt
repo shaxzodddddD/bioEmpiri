@@ -10,3 +10,4 @@ aiosqlite
 passlib[bcrypt]
 python-dotenv
 email-validator
+bcrypt==4.3.0
