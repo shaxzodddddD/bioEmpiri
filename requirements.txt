@@ -9,3 +9,4 @@ asyncpg
 aiosqlite
 passlib[bcrypt]
 python-dotenv
+email-validator
