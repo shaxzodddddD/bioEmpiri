@@ -2,24 +2,23 @@ import os
 import json
 import random
 import asyncio
-import hashlib
 import base64
 import httpx
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from pydantic import BaseModel, Field, EmailStr
-from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, File, UploadFile, Form, Depends
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, Depends, File, UploadFile, Form
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, Text, JSON, ForeignKey, select, delete, update
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import sessionmaker, relationship, selectinload
+from sqlalchemy.orm import sessionmaker, relationship
 from passlib.context import CryptContext
 import uvicorn
 
 # ==========================================
-# GEMINI AI (ixtiyoriy)
+# GEMINI (ixtiyoriy)
 # ==========================================
 try:
     import google.generativeai as genai
@@ -28,7 +27,7 @@ except ImportError:
     GEMINI_AVAILABLE = False
 
 # ==========================================
-# KONFIGURATSIYA
+# KONFIG
 # ==========================================
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
@@ -38,17 +37,17 @@ if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
 # ==========================================
-# BAZA SOZLAMALARI
+# BAZA (PostgreSQL / SQLite)
 # ==========================================
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 if not DATABASE_URL:
     DATABASE_URL = "sqlite+aiosqlite:///./bioempire.db"
 else:
+    # Render’da DATABASE_URL postgresql://... bo‘ladi, uni asyncpg ga aylantiramiz
     if DATABASE_URL.startswith("postgresql://"):
         DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
-    else:
-        if "postgresql+asyncpg" not in DATABASE_URL:
-            DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+    elif "postgresql+asyncpg" not in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
@@ -63,11 +62,11 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
 
 # ==========================================
-# SQLALCHEMY MODELLAR
+# MODELLAR
 # ==========================================
 class User(Base):
     __tablename__ = "users"
@@ -189,7 +188,7 @@ class CEOIdea(Base):
     content = Column(Text, nullable=False)
 
 # ==========================================
-# DEPENDENCY: get_db
+# DEPENDENCY
 # ==========================================
 async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
@@ -207,16 +206,10 @@ def generate_notification_id():
 def generate_tournament_id():
     return f"tournament_{random.randint(1000,9999)}"
 
-def generate_product_sale_id():
-    return f"sale_{random.randint(10000,99999)}_{int(datetime.now().timestamp())}"
-
-def generate_campaign_id():
-    return f"camp_{random.randint(10000,99999)}_{int(datetime.now().timestamp())}"
-
 # ==========================================
-# FASTAPI APP
+# FASTAPI
 # ==========================================
-app = FastAPI(title="BioEmpire V11", version="11.0.0")
+app = FastAPI(title="BioEmpire V12")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -226,7 +219,7 @@ app.add_middleware(
 )
 
 # ==========================================
-# WEB SOCKET
+# WEBSOCKET
 # ==========================================
 class ConnectionManager:
     def __init__(self):
@@ -241,16 +234,16 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
-        for connection in self.active_connections:
+        for conn in self.active_connections:
             try:
-                await connection.send_json(message)
-            except Exception:
+                await conn.send_json(message)
+            except:
                 pass
 
 manager = ConnectionManager()
 
 # ==========================================
-# AI CALLS (GROQ + GEMINI)
+# AI CALLS
 # ==========================================
 async def call_groq_api(messages: List[dict]) -> Optional[str]:
     if not GROQ_API_KEY:
@@ -265,30 +258,30 @@ async def call_groq_api(messages: List[dict]) -> Optional[str]:
     }
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, headers=headers, json=data)
-            if response.status_code == 200:
-                return response.json()["choices"][0]["message"]["content"]
-            return None
+            resp = await client.post(url, headers=headers, json=data)
+            if resp.status_code == 200:
+                return resp.json()["choices"][0]["message"]["content"]
     except:
-        return None
+        pass
+    return None
 
 async def call_gemini_api(messages: List[dict]) -> Optional[str]:
     if not GEMINI_AVAILABLE or not GEMINI_API_KEY:
         return None
     try:
         model = genai.GenerativeModel(GEMINI_MODEL)
-        user_message = messages[-1]["content"] if messages else ""
+        user_msg = messages[-1]["content"] if messages else ""
         context = "\n".join([m["content"] for m in messages if m["role"] == "system"])
-        full_prompt = f"{context}\n\nFoydalanuvchi: {user_message}" if context else user_message
+        full_prompt = f"{context}\n\nFoydalanuvchi: {user_msg}" if context else user_msg
         response = await asyncio.to_thread(model.generate_content, full_prompt)
         return response.text if response and response.text else None
     except:
         return None
 
 async def call_ai_api(messages: List[dict]) -> Optional[str]:
-    response = await call_gemini_api(messages)
-    if response:
-        return response
+    resp = await call_gemini_api(messages)
+    if resp:
+        return resp
     return await call_groq_api(messages)
 
 # ==========================================
@@ -387,23 +380,23 @@ async def root():
     except FileNotFoundError:
         return HTML
 
-# ===== AUTH – RO‘YXATDAN O‘TISH =====
+# ===== AUTH =====
 @app.post("/api/v2/auth/signup")
 async def signup(user: UserRegister, db: AsyncSession = Depends(get_db)):
+    # username tekshirish
     stmt = select(User).where(User.username == user.username)
-    result = await db.execute(stmt)
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Bu username allaqachon band.")
-    
+    res = await db.execute(stmt)
+    if res.scalar_one_or_none():
+        raise HTTPException(400, "Bu username allaqachon band.")
+    # email tekshirish
     stmt = select(User).where(User.email == user.email)
-    result = await db.execute(stmt)
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Bu email allaqachon ro'yxatdan o'tgan.")
+    res = await db.execute(stmt)
+    if res.scalar_one_or_none():
+        raise HTTPException(400, "Bu email allaqachon ro'yxatdan o'tgan.")
     
     curr = user.currency.upper()
     if curr not in ["USD", "EUR", "BTC", "SOL"]:
         curr = "USD"
-    
     rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
     initial_balance = 25000.0 * rates.get(curr, 1.0)
     
@@ -412,32 +405,22 @@ async def signup(user: UserRegister, db: AsyncSession = Depends(get_db)):
         email=user.email,
         password_hash=hash_password(user.password),
         currency=curr,
-        balance=initial_balance,
-        registered_at=datetime.utcnow()
+        balance=initial_balance
     )
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
-    
-    return {
-        "status": "success",
-        "username": new_user.username,
-        "balance": new_user.balance,
-        "currency": new_user.currency
-    }
+    return {"status": "success", "username": new_user.username, "balance": new_user.balance, "currency": new_user.currency}
 
-# ===== AUTH – KIRISH =====
 @app.post("/api/v2/auth/signin")
 async def signin(user: UserLogin, db: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.username == user.username)
-    result = await db.execute(stmt)
-    db_user = result.scalar_one_or_none()
+    res = await db.execute(stmt)
+    db_user = res.scalar_one_or_none()
     if not db_user:
-        raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
-    
+        raise HTTPException(400, "Noto'g'ri username yoki parol.")
     if not verify_password(user.password, db_user.password_hash):
-        raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
-    
+        raise HTTPException(400, "Noto'g'ri username yoki parol.")
     return {
         "status": "success",
         "username": db_user.username,
@@ -454,10 +437,10 @@ async def signin(user: UserLogin, db: AsyncSession = Depends(get_db)):
 @app.get("/api/v2/profile/{username}")
 async def get_profile(username: str, db: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.username == username)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        raise HTTPException(404, "Foydalanuvchi topilmadi.")
     return {
         "username": user.username,
         "email": user.email,
@@ -481,34 +464,31 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db)):
 @app.post("/api/v2/profile/update")
 async def update_profile(req: ProfileUpdate, db: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.username == req.username)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
-    
+        raise HTTPException(404, "Foydalanuvchi topilmadi.")
     update_data = req.dict(exclude_unset=True, exclude={"username"})
     for key, value in update_data.items():
         if value is not None:
             setattr(user, key, value)
-    
     await db.commit()
-    return {"success": True, "profile": user.username}
+    return {"success": True}
 
 # ===== SOCIAL =====
 @app.get("/api/v2/social/posts")
 async def get_social_posts(db: AsyncSession = Depends(get_db)):
     stmt = select(SocialPost).order_by(SocialPost.timestamp.desc()).limit(100)
-    result = await db.execute(stmt)
-    posts = result.scalars().all()
+    res = await db.execute(stmt)
+    posts = res.scalars().all()
     return [{"id": p.id, "username": p.username, "content": p.content, "timestamp": p.timestamp, "likes": p.likes, "comments": p.comments, "is_ai": p.is_ai} for p in posts]
 
 @app.post("/api/v2/social/post")
 async def create_social_post(req: SocialPostRequest, db: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.username == req.username)
-    result = await db.execute(stmt)
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
-    
+    res = await db.execute(stmt)
+    if not res.scalar_one_or_none():
+        raise HTTPException(404, "Foydalanuvchi topilmadi.")
     post = SocialPost(
         id=generate_post_id(),
         username=req.username,
@@ -526,10 +506,10 @@ async def create_social_post(req: SocialPostRequest, db: AsyncSession = Depends(
 @app.post("/api/v2/social/like")
 async def like_post(req: LikeRequest, db: AsyncSession = Depends(get_db)):
     stmt = select(SocialPost).where(SocialPost.id == req.post_id)
-    result = await db.execute(stmt)
-    post = result.scalar_one_or_none()
+    res = await db.execute(stmt)
+    post = res.scalar_one_or_none()
     if not post:
-        raise HTTPException(status_code=404, detail="Post topilmadi.")
+        raise HTTPException(404, "Post topilmadi.")
     post.likes += 1
     await db.commit()
     return {"success": True, "likes": post.likes}
@@ -537,10 +517,10 @@ async def like_post(req: LikeRequest, db: AsyncSession = Depends(get_db)):
 @app.post("/api/v2/social/comment")
 async def comment_post(req: CommentRequest, db: AsyncSession = Depends(get_db)):
     stmt = select(SocialPost).where(SocialPost.id == req.post_id)
-    result = await db.execute(stmt)
-    post = result.scalar_one_or_none()
+    res = await db.execute(stmt)
+    post = res.scalar_one_or_none()
     if not post:
-        raise HTTPException(status_code=404, detail="Post topilmadi.")
+        raise HTTPException(404, "Post topilmadi.")
     comments = post.comments or []
     comments.append({"username": req.username, "text": req.comment, "timestamp": datetime.now().isoformat()})
     post.comments = comments
@@ -550,11 +530,10 @@ async def comment_post(req: CommentRequest, db: AsyncSession = Depends(get_db)):
 @app.post("/api/v2/social/repost")
 async def repost_post(req: LikeRequest, db: AsyncSession = Depends(get_db)):
     stmt = select(SocialPost).where(SocialPost.id == req.post_id)
-    result = await db.execute(stmt)
-    original = result.scalar_one_or_none()
+    res = await db.execute(stmt)
+    original = res.scalar_one_or_none()
     if not original:
-        raise HTTPException(status_code=404, detail="Post topilmadi.")
-    
+        raise HTTPException(404, "Post topilmadi.")
     new_post = SocialPost(
         id=generate_post_id(),
         username=req.username,
@@ -573,13 +552,13 @@ async def follow_user(req: FollowRequest, db: AsyncSession = Depends(get_db)):
     if req.username == req.target:
         return {"success": False, "message": "O'zingizni kuzata olmaysiz."}
     stmt = select(User).where(User.username.in_([req.username, req.target]))
-    result = await db.execute(stmt)
-    users = result.scalars().all()
+    res = await db.execute(stmt)
+    users = res.scalars().all()
     if len(users) != 2:
-        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
+        raise HTTPException(404, "Foydalanuvchi topilmadi.")
     stmt = select(Follow).where(Follow.follower == req.username, Follow.following == req.target)
-    result = await db.execute(stmt)
-    if result.scalar_one_or_none():
+    res = await db.execute(stmt)
+    if res.scalar_one_or_none():
         return {"success": False, "message": "Siz allaqachon bu foydalanuvchini kuzatasiz."}
     follow = Follow(follower=req.username, following=req.target)
     db.add(follow)
@@ -590,15 +569,15 @@ async def follow_user(req: FollowRequest, db: AsyncSession = Depends(get_db)):
 @app.get("/api/v2/notifications/{username}")
 async def get_notifications(username: str, db: AsyncSession = Depends(get_db)):
     stmt = select(Notification).where(Notification.username == username).order_by(Notification.timestamp.desc()).limit(20)
-    result = await db.execute(stmt)
-    notifs = result.scalars().all()
+    res = await db.execute(stmt)
+    notifs = res.scalars().all()
     return [{"id": n.id, "message": n.message, "type": n.type, "timestamp": n.timestamp.isoformat(), "read": n.read} for n in notifs]
 
 @app.post("/api/v2/notifications/read/{username}")
 async def mark_notifications_read(username: str, db: AsyncSession = Depends(get_db)):
     stmt = select(Notification).where(Notification.username == username, Notification.read == False)
-    result = await db.execute(stmt)
-    notifs = result.scalars().all()
+    res = await db.execute(stmt)
+    notifs = res.scalars().all()
     for n in notifs:
         n.read = True
     await db.commit()
@@ -608,112 +587,89 @@ async def mark_notifications_read(username: str, db: AsyncSession = Depends(get_
 @app.post("/api/v2/ai/chat")
 async def ai_chat(req: AIChatRequest, db: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.username == req.username)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
-    
+        raise HTTPException(404, "Foydalanuvchi topilmadi.")
     chat_price = 49.0
     rate = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
     price = chat_price * rate.get(user.currency, 1.0)
-    
     if user.balance < price:
         return {"success": False, "message": f"⚠️ AI chat uchun ${price:.2f} kerak."}
-    
     user.balance -= price
     await db.commit()
-    
-    messages = [
-        {"role": "system", "content": "Siz BioEmpire AI shifokorisiz. Kasalliklar haqida batafsil ma'lumot bering."},
-        {"role": "user", "content": req.message}
-    ]
+    messages = [{"role": "system", "content": "Siz BioEmpire AI shifokorisiz."}, {"role": "user", "content": req.message}]
     ai_response = await call_ai_api(messages)
     if not ai_response:
         ai_response = "🧬 Simptomlaringiz virusli infeksiyaga o'xshaydi. 3 kun dam oling va ko'p suv iching."
-    
     return {"success": True, "response": ai_response, "new_balance": user.balance, "deducted": price}
 
 # ===== CAMERA =====
 @app.post("/api/v2/camera/analyze")
 async def camera_analyze(req: CameraAnalysisRequest, db: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.username == req.username)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi.")
-    
-    analysis_price = 150.0
-    rate = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
-    price = analysis_price * rate.get(user.currency, 1.0)
-    
+        raise HTTPException(404, "Foydalanuvchi topilmadi.")
+    price = 150.0 * {"USD":1.0, "EUR":0.92, "BTC":0.000015, "SOL":0.0075}.get(user.currency, 1.0)
     if user.balance < price:
         return {"success": False, "message": f"⚠️ Kamera analizi uchun ${price:.2f} kerak."}
-    
     user.balance -= price
     await db.commit()
-    
-    analysis_result = "🔬 Rasm tahlili: Teri toshmasi aniqlangan. Dermatologga murojaat qilish tavsiya etiladi."
-    
+    analysis = "🔬 Rasm tahlili: Teri toshmasi aniqlangan. Dermatologga murojaat qilish tavsiya etiladi."
     if req.image_data and GEMINI_AVAILABLE and GEMINI_API_KEY:
         try:
-            image_data = req.image_data.split(",")[1] if "," in req.image_data else req.image_data
-            image_bytes = base64.b64decode(image_data)
+            img_data = req.image_data.split(",")[1] if "," in req.image_data else req.image_data
+            img_bytes = base64.b64decode(img_data)
             model = genai.GenerativeModel(GEMINI_MODEL)
-            response = await asyncio.to_thread(
+            resp = await asyncio.to_thread(
                 model.generate_content,
-                ["Ushbu rasmni tahlil qiling va diagnostik tavsiya bering.", {"mime_type": "image/jpeg", "data": image_bytes}]
+                ["Ushbu rasmni tahlil qiling va diagnostik tavsiya bering.", {"mime_type": "image/jpeg", "data": img_bytes}]
             )
-            if response and response.text:
-                analysis_result = "🔬 " + response.text
+            if resp and resp.text:
+                analysis = "🔬 " + resp.text
         except Exception as e:
-            analysis_result = f"🔬 Rasm tahlilida xatolik: {e}"
-    
-    return {"success": True, "analysis": analysis_result, "new_balance": user.balance, "deducted": price}
+            analysis = f"🔬 Rasm tahlilida xatolik: {e}"
+    return {"success": True, "analysis": analysis, "new_balance": user.balance, "deducted": price}
 
 # ===== HEALTH RANKING =====
 @app.get("/api/v2/health/ranking")
 async def get_health_ranking(db: AsyncSession = Depends(get_db)):
     stmt = select(User).order_by(User.health_score.desc())
-    result = await db.execute(stmt)
-    users = result.scalars().all()
+    res = await db.execute(stmt)
+    users = res.scalars().all()
     return [{"username": u.username, "health_score": u.health_score, "status": u.status, "avatar": u.avatar} for u in users]
 
 # ===== STATS =====
 @app.get("/api/v2/system/stats")
 async def get_system_stats(db: AsyncSession = Depends(get_db)):
     stmt = select(User)
-    result = await db.execute(stmt)
-    users = result.scalars().all()
+    res = await db.execute(stmt)
+    users = res.scalars().all()
     total_users = len(users)
-    
-    stmt = select(ProductSale)
-    result = await db.execute(stmt)
-    sales = result.scalars().all()
+    stmt2 = select(ProductSale)
+    res2 = await db.execute(stmt2)
+    sales = res2.scalars().all()
     total_revenue = sum(s.total_price for s in sales) if sales else 0.0
-    
     active_users = len([u for u in users if u.last_active and (datetime.utcnow() - u.last_active) < timedelta(days=1)])
-    
-    stmt = select(SocialPost)
-    result = await db.execute(stmt)
-    total_social_posts = len(result.scalars().all())
-    
+    stmt3 = select(SocialPost)
+    res3 = await db.execute(stmt3)
+    total_posts = len(res3.scalars().all())
     return {
         "total_revenue": total_revenue,
         "active_users": active_users,
         "total_sales": len(sales),
-        "total_social_posts": total_social_posts
+        "total_social_posts": total_posts
     }
 
 # ===== AI ADS =====
 @app.get("/api/v2/ai/ads-performance")
 async def get_ads_performance(db: AsyncSession = Depends(get_db)):
     stmt = select(AdsPerformance)
-    result = await db.execute(stmt)
-    ads = result.scalars().all()
+    res = await db.execute(stmt)
+    ads = res.scalars().all()
     return {a.campaign_id: {"product_name": a.product_name, "type": a.type, "conversions": a.conversions, "impressions": a.impressions, "ctr": a.ctr, "roi": a.roi, "budget": a.budget, "spent": a.spent, "active": a.active} for a in ads}
-
-# ===== PAKETLAR =====
-# qisqacha, asosiy endpointlar yetarli
 
 # ===== ADMIN =====
 ADMIN_USERNAME = "CEO"
@@ -731,14 +687,28 @@ async def admin_dashboard(username: str = None, password: str = None, db: AsyncS
     if username != ADMIN_USERNAME or not verify_password(password or "", ADMIN_PASSWORD_HASH):
         raise HTTPException(401, "Avtorizatsiya kerak")
     stmt = select(User)
-    result = await db.execute(stmt)
-    users = result.scalars().all()
+    res = await db.execute(stmt)
+    users = res.scalars().all()
+    stmt2 = select(ProductSale)
+    res2 = await db.execute(stmt2)
+    sales = res2.scalars().all()
+    total_revenue = sum(s.total_price for s in sales) if sales else 0.0
     return {
         "total_users": len(users),
-        "total_revenue": 0,  # hisoblab chiqish mumkin
-        "active_users": 0,
-        "total_sales": 0
+        "total_revenue": total_revenue,
+        "active_users": len([u for u in users if u.last_active and (datetime.utcnow() - u.last_active) < timedelta(days=1)]),
+        "total_sales": len(sales)
     }
+
+# ===== CEO =====
+@app.get("/api/v2/ceo/dashboard")
+async def ceo_dashboard(username: str = None, password: str = None, db: AsyncSession = Depends(get_db)):
+    if username != ADMIN_USERNAME or not verify_password(password or "", ADMIN_PASSWORD_HASH):
+        raise HTTPException(401, "Faqat CEO uchun")
+    stmt = select(CEOIdea).order_by(CEOIdea.timestamp.desc()).limit(5)
+    res = await db.execute(stmt)
+    ideas = res.scalars().all()
+    return {"insights": [{"timestamp": i.timestamp.isoformat(), "content": i.content} for i in ideas]}
 
 # ===== WEBSOCKET =====
 @app.websocket("/ws/notifications")
@@ -751,432 +721,21 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 # ==========================================
-# FALLBACK HTML (agar templates/index.html topilmasa)
-# ==========================================
-HTML = """<!DOCTYPE html>
-<html lang="uz">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧬 BioEmpire V11</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { background: #E8F5E9; font-family: 'Segoe UI', system-ui, sans-serif; margin:0; }
-        .glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); border: 1px solid rgba(102,187,106,0.3); border-radius: 20px; box-shadow: 0 8px 32px rgba(0,40,0,0.08); padding:20px; }
-        .btn-cyber { background: linear-gradient(135deg, #66BB6A, #43A047); border: none; color: white; padding: 10px 24px; border-radius: 12px; cursor: pointer; font-weight: 700; transition: 0.25s; }
-        .btn-cyber:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(102,187,106,0.35); }
-        .btn-gold { background: linear-gradient(135deg, #FFB300, #F9A825); color: #1B3A1B; }
-        .btn-red { background: linear-gradient(135deg, #E53935, #C62828); color: white; }
-        .chat-msg { margin-bottom: 8px; padding: 6px 14px; border-radius: 12px; max-width: 90%; }
-        .chat-msg.ai { background: rgba(102,187,106,0.08); border-left: 3px solid #66BB6A; }
-        .chat-msg.user { background: rgba(255,179,0,0.08); border-right: 3px solid #FFB300; text-align: right; margin-left: auto; }
-        #auth-panel { position: fixed; top: 0; right: -420px; width: 400px; height: 100vh; background: white; box-shadow: -4px 0 20px rgba(0,0,0,0.1); transition: right 0.4s ease; z-index: 9999; padding: 30px 24px; overflow-y: auto; border-left: 2px solid #66BB6A; }
-        #auth-panel.open { right: 0; }
-        #auth-panel h2 { color: #1B3A1B; font-weight: 800; margin-bottom: 20px; }
-        .auth-tabs { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px; }
-        .auth-tab { padding: 6px 28px; border-radius: 30px; cursor: pointer; border: 2px solid transparent; font-weight: 700; color: #4A6A4A; }
-        .auth-tab.active { border-color: #66BB6A; color: #43A047; background: rgba(102,187,106,0.08); }
-        .input-group { margin-bottom: 16px; }
-        .input-group label { display: block; font-size: 12px; font-weight: 700; color: #43A047; margin-bottom: 4px; }
-        .input-group input, .input-group select { width: 100%; background: #f5faf5; border: 1.5px solid rgba(102,187,106,0.3); padding: 10px 14px; color: #1B3A1B; border-radius: 12px; outline: none; }
-        .input-group input:focus { border-color: #66BB6A; box-shadow: 0 0 0 4px rgba(102,187,106,0.1); }
-        #auth-toggle-btn { position: fixed; top: 20px; right: 20px; z-index: 10000; background: #66BB6A; color: white; border: none; padding: 12px 24px; border-radius: 30px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px rgba(102,187,106,0.3); transition: 0.25s; }
-        #auth-toggle-btn:hover { transform: scale(1.05); box-shadow: 0 8px 28px rgba(102,187,106,0.4); }
-        #main-dashboard { display: none; }
-        .sidebar { width: 250px; flex-shrink: 0; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border-right: 1px solid rgba(102,187,106,0.3); height: calc(100vh - 68px); overflow-y: auto; padding: 16px 12px; position: sticky; top: 68px; }
-        .sidebar-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; background: transparent; border: 1px solid transparent; border-radius: 14px; color: #4A6A4A; cursor: pointer; transition: 0.2s; }
-        .sidebar-btn:hover { background: rgba(102,187,106,0.06); border-color: rgba(102,187,106,0.3); }
-        .sidebar-btn.active { background: rgba(102,187,106,0.1); border-color: #66BB6A; color: #43A047; font-weight: 600; }
-        .panel { display: none; animation: fadeSlide 0.3s ease; }
-        .panel.active { display: block; }
-        @keyframes fadeSlide { 0%{opacity:0;transform:translateY(10px);} 100%{opacity:1;transform:translateY(0);} }
-        .chat-terminal { height: 200px; background: #f9fbf9; border: 1px solid rgba(102,187,106,0.3); border-radius: 14px; padding: 12px 16px; overflow-y: auto; }
-        .feed-item { background: rgba(255,255,255,0.6); border: 1px solid rgba(102,187,106,0.3); padding: 12px 16px; border-radius: 14px; margin-bottom: 10px; border-left: 4px solid #66BB6A; }
-        .feed-item .user { color: #43A047; font-weight: 700; }
-        .feed-item .time { color: #4A6A4A; font-size: 11px; float: right; }
-        .feed-item .actions { margin-top: 8px; display: flex; gap: 16px; font-size: 13px; color: #4A6A4A; cursor: pointer; }
-        .feed-item .actions span:hover { color: #43A047; }
-        .package-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-top: 14px; }
-        .package-card { background: white; border: 1px solid rgba(255,179,0,0.15); border-radius: 14px; padding: 14px 8px; text-align: center; cursor: pointer; transition: 0.25s; }
-        .package-card:hover { border-color: #FFB300; transform: translateY(-4px); box-shadow: 0 8px 24px rgba(255,179,0,0.08); }
-        .package-card .pkg-name { font-size: 12px; font-weight: 700; }
-        .package-card .pkg-price { color: #FFB300; font-size: 15px; font-weight: 800; }
-        .ranking-item { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid rgba(0,0,0,0.05); }
-        .ranking-item .pos { color: #FFB300; font-weight: 700; width: 30px; }
-        .notif-badge { position: absolute; top: -6px; right: -8px; background: #E53935; color: white; border-radius: 50%; padding: 0 6px; font-size: 10px; font-weight: 800; min-width: 18px; text-align: center; animation: pulse-badge 1.8s infinite; }
-        @keyframes pulse-badge { 0%,100%{transform:scale(1);} 50%{transform:scale(1.15);} }
-        .notif-dropdown { position: absolute; right: 0; top: 42px; width: 300px; max-height: 320px; overflow-y: auto; background: white; border: 1px solid rgba(102,187,106,0.3); border-radius: 16px; padding: 14px; display: none; z-index: 200; }
-        .notif-dropdown.show { display: block; }
-        .notif-item { padding: 8px 10px; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 13px; }
-        .notif-item .time { color: #4A6A4A; font-size: 11px; float: right; }
-        .notif-item.unread { border-left: 3px solid #66BB6A; }
-        #camera-preview { width: 100%; max-height: 240px; border-radius: 16px; background: #000; object-fit: cover; border: 2px solid rgba(102,187,106,0.3); }
-        .voice-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #66BB6A; margin-right: 6px; animation: pulse-dot 1s infinite; }
-        @keyframes pulse-dot { 0%,100%{opacity:0.4;transform:scale(0.9);} 50%{opacity:1;transform:scale(1.2);} }
-        .avatar-lg { width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, #C8E6C9, #66BB6A); display: flex; align-items: center; justify-content: center; font-size: 28px; border: 2px solid #FFB300; flex-shrink: 0; }
-        @media (max-width:1024px) { .sidebar { width: 70px !important; padding: 10px 6px; } .sidebar .btn-text { display: none; } .sidebar .icon { font-size: 24px; width: 100%; text-align: center; } }
-        @media (max-width:768px) { .sidebar { display: none; } #auth-panel { width: 100%; right: -100%; } }
-        .status-badge { display: inline-block; padding: 2px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-        .status-warning { background: #FFB300; color: #1B3A1B; }
-        .status-red { background: #E53935; color: white; }
-        .status-optimized { background: #66BB6A; color: white; }
-        .status-immortal { background: #FFB300; color: #1B3A1B; }
-    </style>
-</head>
-<body>
-
-<!-- TUGMA: O'NG TOMONDAN AUTH PANELNI OCHISH -->
-<button id="auth-toggle-btn" onclick="toggleAuthPanel()">🔐 Kirish / Ro'yxatdan o'tish</button>
-
-<!-- AUTH PANEL (O'NG TOMON) -->
-<div id="auth-panel">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <h2>🔐 TIZIMGA ULANISH</h2>
-        <button onclick="toggleAuthPanel()" style="background:none; border:none; font-size:24px; cursor:pointer;">✕</button>
-    </div>
-    <div class="auth-tabs">
-        <span id="tab-signup" class="auth-tab active" onclick="switchAuth('signup')">Ro'yxatdan o'tish</span>
-        <span id="tab-signin" class="auth-tab" onclick="switchAuth('signin')">Kirish</span>
-    </div>
-    <div id="email-group" class="input-group">
-        <label>📧 E-mail</label>
-        <input type="email" id="auth-email" placeholder="your@email.com" />
-    </div>
-    <div class="input-group">
-        <label>👤 Username</label>
-        <input type="text" id="auth-user" placeholder="Bio_User" />
-    </div>
-    <div class="input-group">
-        <label>🔑 Parol</label>
-        <input type="password" id="auth-pass" placeholder="••••••••" />
-    </div>
-    <div id="currency-group" class="input-group">
-        <label>💱 Valyuta</label>
-        <select id="auth-curr">
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-            <option value="BTC">BTC</option>
-            <option value="SOL">SOL</option>
-        </select>
-    </div>
-    <button class="btn-cyber w-full" onclick="executeAuth()">🚀 TIZIMNI FAOLASHTIRISH</button>
-    <p id="auth-error" class="text-red-500 text-xs mt-3 text-center"></p>
-    <div class="text-center mt-3 text-xs text-gray-500">Admin: CEO / parol: 12345678</div>
-</div>
-
-<!-- DASHBOARD -->
-<div id="main-dashboard" style="display:none;">
-    <header class="fixed top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-[#66BB6A33] px-4 py-2 flex items-center justify-between">
-        <div class="flex items-center gap-3 cursor-pointer" onclick="location.reload()">
-            <span class="text-3xl">🧬</span>
-            <span class="text-xl font-black text-[#2E7D32]">BioEmpire ∞</span>
-        </div>
-        <div class="flex items-center gap-4">
-            <div class="notif-bell relative" onclick="toggleNotifications()">
-                🔔 <span class="notif-badge" id="notif-count">0</span>
-                <div class="notif-dropdown" id="notif-dropdown">
-                    <div class="font-bold text-[#43A047] text-xs mb-2">📬 Bildirishnomalar</div>
-                    <div id="notif-list"></div>
-                </div>
-            </div>
-            <span id="header-user" class="text-xs text-[#43A047] hidden"></span>
-            <button id="logout-btn" class="btn-red btn-sm hidden" onclick="logout()">Chiqish</button>
-            <button onclick="toggleAuthPanel()" class="btn-cyber btn-sm">🔐</button>
-        </div>
-    </header>
-
-    <div class="flex pt-[68px]">
-        <!-- SIDEBAR -->
-        <aside class="sidebar" id="main-sidebar">
-            <div class="flex items-center gap-3 p-3 rounded-xl bg-[#F1F8E9] border border-[#66BB6A33] mb-4">
-                <div class="avatar-lg" id="sidebar-avatar">🧬</div>
-                <div class="flex-1 min-w-0">
-                    <div class="font-bold text-sm text-[#1B3A1B] truncate" id="sidebar-username">-</div>
-                    <div class="text-xs text-gray-500" id="sidebar-status">WARNING</div>
-                </div>
-                <div class="text-right">
-                    <div class="text-[10px] text-gray-400">Balans</div>
-                    <div class="text-sm font-bold text-[#43A047]" id="sidebar-balance">0.00</div>
-                </div>
-            </div>
-            <button class="sidebar-btn active" data-panel="panel-consult" onclick="switchPanel('panel-consult', this)"><span class="icon">🩺</span><span class="btn-text">Konsultatsiya</span></button>
-            <button class="sidebar-btn" data-panel="panel-social" onclick="switchPanel('panel-social', this)"><span class="icon">📡</span><span class="btn-text">Ijtimoiy</span><span class="badge" id="feed-badge">0</span></button>
-            <button class="sidebar-btn" data-panel="panel-profile" onclick="switchPanel('panel-profile', this)"><span class="icon">👤</span><span class="btn-text">Profil</span></button>
-            <button class="sidebar-btn" data-panel="panel-packages" onclick="switchPanel('panel-packages', this)"><span class="icon">📦</span><span class="btn-text">Paketlar</span></button>
-            <button class="sidebar-btn" data-panel="panel-stats" onclick="switchPanel('panel-stats', this)"><span class="icon">📊</span><span class="btn-text">Statistika</span></button>
-            <button class="sidebar-btn" data-panel="panel-ads" onclick="switchPanel('panel-ads', this)"><span class="icon">📈</span><span class="btn-text">AI ADS</span></button>
-            <button class="sidebar-btn" data-panel="panel-admin" onclick="switchPanel('panel-admin', this)"><span class="icon">⚙️</span><span class="btn-text">Admin</span></button>
-        </aside>
-
-        <!-- CONTENT -->
-        <main class="flex-1 min-w-0 p-4 max-w-full">
-            <!-- Konsultatsiya -->
-            <div id="panel-consult" class="panel active">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">🩺 AI KONSULTATSIYA</h2>
-                    <div class="mb-4">
-                        <div class="flex gap-2 flex-wrap">
-                            <button class="btn-cyber btn-sm" onclick="startCamera()">📷 Kamerani yoqish</button>
-                            <button class="btn-gold btn-sm" onclick="captureAndAnalyze()">🔬 Suratga olib tahlil</button>
-                            <button class="btn-red btn-sm" onclick="stopCamera()">⏹ To'xtatish</button>
-                        </div>
-                        <video id="camera-preview" autoplay playsinline style="display:none;"></video>
-                        <div id="camera-placeholder" class="bg-gray-100 rounded-xl p-4 text-center text-gray-400 text-sm border border-dashed border-[#66BB6A33]">Kamera o'chirilgan</div>
-                        <div id="camera-result" class="mt-2 text-sm text-[#43A047]"></div>
-                    </div>
-                    <div class="mb-4">
-                        <button class="btn-cyber btn-sm" onclick="startVoice()">🎤 Ovoz bilan gapirish</button>
-                        <button class="btn-red btn-sm" onclick="stopVoice()">⏹ To'xtatish</button>
-                        <span id="voice-status" class="text-sm text-gray-500"></span>
-                        <div id="voice-transcript" class="mt-2 p-3 bg-gray-50 rounded-xl text-sm text-gray-700 min-h-[48px] border border-[#66BB6A33]">Ovoz matni...</div>
-                    </div>
-                    <div>
-                        <div class="chat-terminal" id="consult-chat">
-                            <div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing yoki gapiring.</div>
-                        </div>
-                        <div class="flex gap-2 mt-3">
-                            <input id="consult-input" type="text" placeholder="Xabar yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" />
-                            <button class="btn-cyber btn-sm" onclick="sendConsult()">Yuborish</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Ijtimoiy -->
-            <div id="panel-social" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">📡 Ijtimoiy tarmoq</h2>
-                    <div class="flex gap-2 mb-4">
-                        <input id="social-input" type="text" placeholder="Holatingiz haqida yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" />
-                        <button class="btn-cyber btn-sm" onclick="createSocialPost()">Yozish</button>
-                    </div>
-                    <div id="social-feed" class="max-h-[520px] overflow-y-auto"></div>
-                </div>
-            </div>
-
-            <!-- Profil -->
-            <div id="panel-profile" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">👤 Profil</h2>
-                    <div id="profile-content"></div>
-                </div>
-            </div>
-
-            <!-- Paketlar -->
-            <div id="panel-packages" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#FFB300] mb-3">📦 Paketlar</h2>
-                    <div class="package-grid" id="package-grid"></div>
-                </div>
-            </div>
-
-            <!-- Statistika -->
-            <div id="panel-stats" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">📊 Statistika</h2>
-                    <div id="stats-content" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-                    <div class="mt-4"><h3 class="text-sm font-bold text-[#43A047]">🏅 Salomatlik reytingi</h3><div id="health-ranking" class="max-h-[200px] overflow-y-auto"></div></div>
-                </div>
-            </div>
-
-            <!-- ADS -->
-            <div id="panel-ads" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#43A047] mb-3">📈 AI ADS</h2>
-                    <div id="ads-performance" class="space-y-2 max-h-[500px] overflow-y-auto"></div>
-                    <button class="btn-cyber btn-sm mt-3" onclick="loadAdsPerformance()">🔄 Yangilash</button>
-                </div>
-            </div>
-
-            <!-- Admin -->
-            <div id="panel-admin" class="panel">
-                <div class="glass">
-                    <h2 class="text-xl font-bold text-[#FFB300] mb-3">⚙️ Admin</h2>
-                    <div class="flex gap-2 mb-4">
-                        <input id="admin-user" type="text" placeholder="Admin" value="CEO" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" />
-                        <input id="admin-pass" type="password" placeholder="Parol" value="12345678" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" />
-                        <button class="btn-cyber btn-sm" onclick="adminLogin()">🔐 Kirish</button>
-                    </div>
-                    <div id="admin-content" class="hidden">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" id="admin-stats-grid"></div>
-                        <div id="admin-data" class="mt-3 max-h-[300px] overflow-y-auto text-sm"></div>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
-</div>
-
-<script>
-// ============================================================
-// GLOBAL
-// ============================================================
-let currentUser = null;
-let authMode = 'signup';
-let tokenBalance = 100;
-let notifCount = 0;
-let cameraStream = null;
-let cameraActive = false;
-let recognition = null;
-let voiceActive = false;
-
-// ============================================================
-// AUTH PANEL
-// ============================================================
-function toggleAuthPanel() {
-    const panel = document.getElementById('auth-panel');
-    panel.classList.toggle('open');
-}
-
-function switchAuth(mode) {
-    authMode = mode;
-    document.getElementById('auth-title').innerText = mode === 'signup' ? '🔐 RO\'YXATDAN O\'TISH' : '🔐 KIRISH';
-    document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
-    document.getElementById('tab-' + mode).classList.add('active');
-    document.getElementById('email-group').style.display = mode === 'signup' ? 'block' : 'none';
-    document.getElementById('currency-group').style.display = mode === 'signup' ? 'block' : 'none';
-}
-
-async function executeAuth() {
-    const user = document.getElementById('auth-user').value.trim();
-    const pass = document.getElementById('auth-pass').value;
-    const email = document.getElementById('auth-email').value.trim();
-    const curr = document.getElementById('auth-curr').value;
-    const errEl = document.getElementById('auth-error');
-    errEl.innerText = '';
-
-    if (!user) { errEl.innerText = "Username kiritilmagan!"; return; }
-    if (!pass || pass.length < 6) { errEl.innerText = "Parol kamida 6 belgi!"; return; }
-    if (authMode === 'signup' && !email) { errEl.innerText = "Email kiritilmagan!"; return; }
-
-    const url = authMode === 'signup' ? '/api/v2/auth/signup' : '/api/v2/auth/signin';
-    const body = authMode === 'signup' ? { username: user, password: pass, email: email, currency: curr } : { username: user, password: pass };
-
-    try {
-        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        const data = await res.json();
-        if (!res.ok) {
-            errEl.innerText = data.detail || "Server xatosi.";
-            return;
-        }
-        if (data.status !== 'success') {
-            errEl.innerText = data.message || "Noma'lum xatolik.";
-            return;
-        }
-
-        currentUser = data.username;
-        document.getElementById('auth-panel').classList.remove('open');
-        document.getElementById('main-dashboard').style.display = 'block';
-        document.getElementById('header-user').innerText = '👤 ' + currentUser;
-        document.getElementById('header-user').className = 'text-xs text-[#43A047] block';
-        document.getElementById('logout-btn').className = 'btn-red btn-sm block';
-
-        loadProfile();
-        loadSocialFeed();
-        loadHealthRanking();
-        loadStats();
-        loadAdsPerformance();
-        renderPackages();
-        setInterval(loadSocialFeed, 8000);
-        setInterval(loadHealthRanking, 15000);
-        setInterval(loadAdsPerformance, 30000);
-    } catch (e) {
-        errEl.innerText = "Tarmoq xatosi: " + e.message;
-        console.error(e);
-    }
-}
-
-function logout() {
-    currentUser = null;
-    document.getElementById('main-dashboard').style.display = 'none';
-    document.getElementById('header-user').className = 'hidden';
-    document.getElementById('logout-btn').className = 'hidden';
-    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); }
-    if (recognition) { recognition.stop(); }
-    toggleAuthPanel();
-}
-
-// ============================================================
-// QOLGAN FUNKSIYALAR (profil, social, konsultatsiya, stat va h.k.)
-// ============================================================
-// ... (avvalgi kodlar bilan bir xil, lekin hozircha qisqartirildi)
-// ...
-
-// ============================================================
-// DASHBOARD FUNKSIYALARI (panel switch, loadProfile, social, chat, camera, voice va boshqalar)
-// ============================================================
-function switchPanel(panelId, btn) {
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    document.getElementById(panelId).classList.add('active');
-    document.querySelectorAll('.sidebar-btn[data-panel]').forEach(b => b.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-    if (panelId === 'panel-profile') loadProfile();
-    if (panelId === 'panel-social') loadSocialFeed();
-    if (panelId === 'panel-stats') { loadStats(); loadHealthRanking(); }
-    if (panelId === 'panel-ads') loadAdsPerformance();
-    if (panelId === 'panel-packages') renderPackages();
-}
-
-async function loadProfile() {
-    if (!currentUser) return;
-    try {
-        const res = await fetch(`/api/v2/profile/${currentUser}`);
-        const data = await res.json();
-        document.getElementById('sidebar-username').innerText = currentUser;
-        document.getElementById('sidebar-balance').innerText = data.balance.toFixed(2);
-        document.getElementById('sidebar-status').innerText = data.status;
-        document.getElementById('sidebar-avatar').innerText = data.avatar || '🧬';
-
-        const container = document.getElementById('profile-content');
-        const statusClass = data.status === 'WARNING' ? 'status-warning' : data.status === 'RED_ZONE' ? 'status-red' : data.status === 'OPTIMIZED' ? 'status-optimized' : 'status-immortal';
-        container.innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]">
-                    <div class="flex items-center gap-4">
-                        <div class="avatar-lg text-4xl">${data.avatar || '🧬'}</div>
-                        <div><div class="text-xl font-bold">${currentUser}</div><div class="text-sm text-gray-500">${data.email}</div></div>
-                    </div>
-                    <div class="mt-4 space-y-1 text-sm">
-                        <p><span class="text-gray-500">Holat:</span> <span class="status-badge ${statusClass}">${data.status}</span></p>
-                        <p><span class="text-gray-500">Balans:</span> <strong class="text-[#43A047]">${data.balance.toFixed(2)} ${data.currency}</strong></p>
-                        <p><span class="text-gray-500">Salomatlik:</span> <strong class="text-[#43A047]">${data.health_score.toFixed(1)}%</strong></p>
-                        <p><span class="text-gray-500">Bio:</span> ${data.bio || 'Yo\'q'}</p>
-                    </div>
-                </div>
-                <div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]">
-                    <h3 class="text-sm font-bold text-[#43A047]">📊 Statistika</h3>
-                    <div class="mt-3 space-y-1 text-sm">
-                        <p><span class="text-gray-500">Tokenlar:</span> <strong>${tokenBalance}</strong></p>
-                    </div>
-                </div>
-            </div>
-        `;
-    } catch (e) { console.error(e); }
-}
-
-// Qolgan funksiyalar (loadSocialFeed, createSocialPost, sendConsult, startCamera, captureAndAnalyze, startVoice, stopVoice, loadHealthRanking, loadStats, loadAdsPerformance, renderPackages, adminLogin va boshqalar) – avvalgi versiyalardan o‘zgarmagan holda qo‘shiladi.
-// Ularning to‘liq kodi manbada mavjud, lekin bu yerda qisqartirilgan.
-
-// ============================================================
-// INIT
-// ============================================================
-window.onload = function() {
-    // hech narsa
-};
-</script>
-</body>
-</html>
-"""
-
-# ==========================================
-# DATABASE TABELLARINI YARATISH (startup)
+# STARTUP – TABELLARNI YARATISH
 # ==========================================
 @app.on_event("startup")
 async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("✅ Baza jadvallari yaratildi (agar mavjud bo'lmasa).")
-    print("🚀 BioEmpire V11 ishga tushdi!")
+    print("✅ Baza jadvallari yaratildi.")
+    print("🚀 BioEmpire V12 ishga tushdi!")
+
+# ==========================================
+# HTML (FALLBACK)
+# ==========================================
+HTML = """<!DOCTYPE html>
+<html><body><h1>🧬 BioEmpire V12</h1><p>Ro'yxatdan o'tish ixtiyoriy, o'ng tomonda.</p></body></html>
+"""
 
 # ==========================================
 # SERVER
