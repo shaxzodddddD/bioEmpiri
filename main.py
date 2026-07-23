@@ -1,5 +1,4 @@
 import os
-import json
 import random
 import asyncio
 import base64
@@ -7,46 +6,45 @@ import httpx
 from datetime import datetime, timedelta
 from typing import Optional, List
 from pydantic import BaseModel, Field, EmailStr
-from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, Depends, File, UploadFile, Form
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, JSON, select, delete, update
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, JSON, select
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from passlib.context import CryptContext
 import uvicorn
 
-# ===== GEMINI (ixtiyoriy) =====
+# ==========================================
+# GEMINI (ixtiyoriy)
+# ==========================================
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
-    print("✅ Gemini AI mavjud")
 except ImportError:
     GEMINI_AVAILABLE = False
-    print("⚠️ Gemini AI o‘rnatilmagan")
 
-# ===== KONFIG =====
+# ==========================================
+# KONFIGURATSIYA
+# ==========================================
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-1.5-flash"
 
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    print("✅ Gemini API sozlandi")
-else:
-    print("⚠️ Gemini API sozlanmadi")
 
-# ===== BAZA =====
+# ==========================================
+# BAZA (PostgreSQL / SQLite)
+# ==========================================
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 if not DATABASE_URL:
     DATABASE_URL = "sqlite+aiosqlite:///./bioempire.db"
-    print("📁 SQLite ishlatiladi (mahalliy)")
 else:
     if DATABASE_URL.startswith("postgresql://"):
         DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
     elif "postgresql+asyncpg" not in DATABASE_URL:
         DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
-    print(f"🐘 PostgreSQL ishlatiladi: {DATABASE_URL[:50]}...")
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
@@ -59,7 +57,9 @@ def hash_password(p: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
-# ===== MODELLAR =====
+# ==========================================
+# MODELLAR
+# ==========================================
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -139,12 +139,16 @@ class CEOIdea(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     content = Column(Text, nullable=False)
 
-# ===== DEPENDENCY =====
+# ==========================================
+# DEPENDENCY
+# ==========================================
 async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
         yield session
 
-# ===== FASTAPI =====
+# ==========================================
+# FASTAPI APP
+# ==========================================
 app = FastAPI(title="BioEmpire V13", version="13.0.0")
 app.add_middleware(
     CORSMiddleware,
@@ -154,7 +158,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ===== WEBSOCKET =====
+# ==========================================
+# WEBSOCKET MANAGER
+# ==========================================
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -170,9 +176,12 @@ class ConnectionManager:
                 await conn.send_json(message)
             except:
                 pass
+
 manager = ConnectionManager()
 
-# ===== AI CALLS =====
+# ==========================================
+# AI CALLS
+# ==========================================
 async def call_groq_api(messages: List[dict]) -> Optional[str]:
     if not GROQ_API_KEY:
         return None
@@ -189,10 +198,8 @@ async def call_groq_api(messages: List[dict]) -> Optional[str]:
             resp = await client.post(url, headers=headers, json=data)
             if resp.status_code == 200:
                 return resp.json()["choices"][0]["message"]["content"]
-            print(f"[Groq] Xatolik: {resp.status_code}")
             return None
-    except Exception as e:
-        print(f"[Groq] Xatolik: {e}")
+    except:
         return None
 
 async def call_gemini_api(messages: List[dict]) -> Optional[str]:
@@ -204,25 +211,15 @@ async def call_gemini_api(messages: List[dict]) -> Optional[str]:
         context = "\n".join([m["content"] for m in messages if m["role"] == "system"])
         full_prompt = f"{context}\n\nFoydalanuvchi: {user_msg}" if context else user_msg
         response = await asyncio.to_thread(model.generate_content, full_prompt)
-        if response and response.text:
-            return response.text
-        print("[Gemini] Javob bo'sh")
-        return None
-    except Exception as e:
-        print(f"[Gemini] Xatolik: {e}")
+        return response.text if response and response.text else None
+    except:
         return None
 
 async def call_ai_api(messages: List[dict]) -> Optional[str]:
-    # Avval Gemini (asosiy)
     resp = await call_gemini_api(messages)
     if resp:
         return resp
-    # Keyin Groq (fallback)
-    resp = await call_groq_api(messages)
-    if resp:
-        return resp
-    # Ikkalasi ham ishlamasa
-    return None
+    return await call_groq_api(messages)
 
 def generate_post_id():
     return f"post_{random.randint(10000,99999)}_{int(datetime.now().timestamp())}"
@@ -230,7 +227,9 @@ def generate_post_id():
 def generate_notification_id():
     return f"notif_{random.randint(10000,99999)}_{int(datetime.now().timestamp())}"
 
-# ===== PYDANTIC MODELLAR =====
+# ==========================================
+# PYDANTIC MODELLAR
+# ==========================================
 class UserRegister(BaseModel):
     username: str = Field(..., min_length=2, max_length=30)
     email: EmailStr
@@ -546,7 +545,6 @@ async def ai_chat(req: AIChatRequest, db: AsyncSession = Depends(get_db)):
     if user.balance < price:
         return {"success": False, "message": f"⚠️ AI chat uchun ${price:.2f} kerak."}
     user.balance -= price
-    # Yangi notification qo'shish (ixtiyoriy)
     notif = Notification(
         id=generate_notification_id(),
         username=req.username,
@@ -730,7 +728,6 @@ async def ceo_dashboard(username: str = None, password: str = None, db: AsyncSes
 async def ceo_generate(username: str = None, password: str = None, db: AsyncSession = Depends(get_db)):
     if username != ADMIN_USERNAME or not verify_password(password or "", ADMIN_PASSWORD_HASH):
         raise HTTPException(401, "Faqat CEO uchun")
-    # AI dan yangi fikr olish
     messages = [
         {"role": "system", "content": "Siz BioEmpire tizimining bosh strategisisiz. Tizim holatini tahlil qilib, CEO uchun quyidagilarni bering: 1) Tizimning kamchiliklari, 2) Cheksiz rivojlanish uchun g'oyalar, 3) AI nazorati haqida ma'lumot, 4) Kelgusi qadamlar."},
         {"role": "user", "content": f"Tizimda {len((await db.execute(select(User))).scalars().all())} foydalanuvchi bor."}
@@ -754,7 +751,7 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 # ==========================================
-# STARTUP – JADVALLARNI YARATISH
+# STARTUP – JADVALLARNI YARATISH (to‘g‘rilangan)
 # ==========================================
 @app.on_event("startup")
 async def startup():
@@ -762,7 +759,12 @@ async def startup():
         await conn.run_sync(Base.metadata.create_all)
     print("✅ Baza jadvallari yaratildi.")
     print("🚀 BioEmpire V13 ishga tushdi!")
-    print(f"👥 Joriy foydalanuvchilar soni: {len((await AsyncSessionLocal()).execute(select(User))).scalars().all()}")
+
+    # To‘g‘ri foydalanuvchilar sonini olish
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(User))
+        users = result.scalars().all()
+        print(f"👥 Joriy foydalanuvchilar soni: {len(users)}")
 
 # ==========================================
 # SERVER
