@@ -10,40 +10,31 @@ from pydantic import BaseModel, Field, EmailStr
 from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, Depends, File, UploadFile, Form
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, Text, JSON, ForeignKey, select, delete, update
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, JSON, select
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import sessionmaker, relationship
 from passlib.context import CryptContext
 import uvicorn
 
-# ==========================================
-# GEMINI (ixtiyoriy)
-# ==========================================
+# ===== GEMINI (ixtiyoriy) =====
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
 
-# ==========================================
-# KONFIG
-# ==========================================
+# ===== KONFIG =====
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-1.5-flash"
-
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# ==========================================
-# BAZA (PostgreSQL / SQLite)
-# ==========================================
+# ===== BAZA =====
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 if not DATABASE_URL:
     DATABASE_URL = "sqlite+aiosqlite:///./bioempire.db"
 else:
-    # Render’da DATABASE_URL postgresql://... bo‘ladi, uni asyncpg ga aylantiramiz
     if DATABASE_URL.startswith("postgresql://"):
         DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
     elif "postgresql+asyncpg" not in DATABASE_URL:
@@ -51,23 +42,16 @@ else:
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
-
 Base = declarative_base()
-
-# ==========================================
-# PASSWORD HASH
-# ==========================================
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+def hash_password(p: str) -> str:
+    return pwd_context.hash(p)
 
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
-# ==========================================
-# MODELLAR
-# ==========================================
+# ===== MODELLAR =====
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -80,7 +64,7 @@ class User(Base):
     department = Column(String(100), default="None")
     health_score = Column(Float, default=85.0)
     avatar = Column(String(10), default="🧬")
-    bio = Column(Text, default="BioEmpire tizimiga yangi qo'shildim")
+    bio = Column(Text, default="")
     full_name = Column(String(100), default="")
     age = Column(Integer, nullable=True)
     gender = Column(String(20), default="")
@@ -110,22 +94,6 @@ class Notification(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     read = Column(Boolean, default=False)
 
-class Tournament(Base):
-    __tablename__ = "tournaments"
-    id = Column(String(50), primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    description = Column(Text, default="")
-    start_date = Column(DateTime, nullable=False)
-    end_date = Column(DateTime, nullable=False)
-    status = Column(String(20), default="active")
-    participants = Column(JSON, default=[])
-    scores = Column(JSON, default={})
-
-class CryptoWallet(Base):
-    __tablename__ = "crypto_wallets"
-    username = Column(String(30), primary_key=True, index=True)
-    wallet_address = Column(String(100), nullable=False)
-
 class ProductSale(Base):
     __tablename__ = "product_sales"
     id = Column(String(50), primary_key=True, index=True)
@@ -137,23 +105,6 @@ class ProductSale(Base):
     currency = Column(String(10), default="USD")
     ordered_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String(20), default="pending")
-
-class MarketingCampaign(Base):
-    __tablename__ = "marketing_campaigns"
-    id = Column(String(50), primary_key=True, index=True)
-    product_id = Column(String(50), nullable=False)
-    product_name = Column(String(100), nullable=False)
-    type = Column(String(30), nullable=False)
-    message = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    target_audience = Column(Text, default="All users")
-    budget = Column(Float, default=100.0)
-    active = Column(Boolean, default=True)
-    conversions = Column(Integer, default=0)
-    impressions = Column(Integer, default=0)
-    ctr = Column(Float, default=0.0)
-    spent = Column(Float, default=0.0)
-    status = Column(String(20), default="active")
 
 class AdsPerformance(Base):
     __tablename__ = "ads_performance"
@@ -168,13 +119,6 @@ class AdsPerformance(Base):
     spent = Column(Float, default=0.0)
     active = Column(Boolean, default=True)
 
-class AILog(Base):
-    __tablename__ = "ai_logs"
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    level = Column(String(10), default="INFO")
-    message = Column(Text, nullable=False)
-
 class Follow(Base):
     __tablename__ = "follows"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -187,75 +131,40 @@ class CEOIdea(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     content = Column(Text, nullable=False)
 
-# ==========================================
-# DEPENDENCY
-# ==========================================
+# ===== DEPENDENCY =====
 async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
         yield session
 
-# ==========================================
-# YORDAMCHI FUNKSIYALAR
-# ==========================================
-def generate_post_id():
-    return f"post_{random.randint(10000,99999)}_{int(datetime.now().timestamp())}"
-
-def generate_notification_id():
-    return f"notif_{random.randint(10000,99999)}_{int(datetime.now().timestamp())}"
-
-def generate_tournament_id():
-    return f"tournament_{random.randint(1000,9999)}"
-
-# ==========================================
-# FASTAPI
-# ==========================================
+# ===== FASTAPI =====
 app = FastAPI(title="BioEmpire V12")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# ==========================================
-# WEBSOCKET
-# ==========================================
+# ===== WEBSOCKET =====
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
-
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
-
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-
     async def broadcast(self, message: dict):
         for conn in self.active_connections:
             try:
                 await conn.send_json(message)
             except:
                 pass
-
 manager = ConnectionManager()
 
-# ==========================================
-# AI CALLS
-# ==========================================
+# ===== AI CALLS =====
 async def call_groq_api(messages: List[dict]) -> Optional[str]:
     if not GROQ_API_KEY:
         return None
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-    data = {
-        "model": "mixtral-8x7b-32768",
-        "messages": messages,
-        "temperature": 0.7,
-        "max_tokens": 2048
-    }
+    data = {"model": "mixtral-8x7b-32768", "messages": messages, "temperature": 0.7, "max_tokens": 2048}
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(url, headers=headers, json=data)
@@ -284,9 +193,10 @@ async def call_ai_api(messages: List[dict]) -> Optional[str]:
         return resp
     return await call_groq_api(messages)
 
-# ==========================================
-# PYDANTIC MODELLAR
-# ==========================================
+def generate_post_id():
+    return f"post_{random.randint(10000,99999)}_{int(datetime.now().timestamp())}"
+
+# ===== PYDANTIC =====
 class UserRegister(BaseModel):
     username: str = Field(..., min_length=2, max_length=30)
     email: EmailStr
@@ -319,93 +229,38 @@ class CameraAnalysisRequest(BaseModel):
     department_id: int
     image_data: Optional[str] = None
 
-class PurchaseRequest(BaseModel):
-    username: str
-    package_type: str
-
-class TournamentJoin(BaseModel):
-    username: str
-    tournament_id: str
-
-class TournamentScore(BaseModel):
-    username: str
-    tournament_id: str
-    score: float
-
-class CryptoConnect(BaseModel):
-    username: str
-    wallet_address: str
-
-class CryptoPay(BaseModel):
-    username: str
-    amount: float
-    currency: str = "USD"
-
-class ProductOrderRequest(BaseModel):
-    username: str
-    product_id: str
-    quantity: int = 1
-
-class VirtualDoctorRequest(BaseModel):
-    username: str
-    symptoms: str
-    level: str = "doctor"
-
-class EmailReport(BaseModel):
-    username: str
-    email: str
-
-class ProfileUpdate(BaseModel):
-    username: str
-    full_name: Optional[str] = None
-    age: Optional[int] = None
-    gender: Optional[str] = None
-    phone: Optional[str] = None
-    address: Optional[str] = None
-    bio: Optional[str] = None
-    avatar: Optional[str] = None
-    social_links: Optional[dict] = None
-
-# ==========================================
-# ENDPOINTLAR
-# ==========================================
-
-# ===== ROOT =====
+# ===== ENDPOINTLAR =====
 @app.get("/", response_class=HTMLResponse)
 @app.head("/", response_class=HTMLResponse)
 async def root():
     try:
         with open("templates/index.html", "r", encoding="utf-8") as f:
             return f.read()
-    except FileNotFoundError:
-        return HTML
+    except:
+        return "<h1>🧬 BioEmpire V12</h1><p>templates/index.html topilmadi</p>"
 
-# ===== AUTH =====
+# AUTH
 @app.post("/api/v2/auth/signup")
 async def signup(user: UserRegister, db: AsyncSession = Depends(get_db)):
-    # username tekshirish
     stmt = select(User).where(User.username == user.username)
     res = await db.execute(stmt)
     if res.scalar_one_or_none():
         raise HTTPException(400, "Bu username allaqachon band.")
-    # email tekshirish
     stmt = select(User).where(User.email == user.email)
     res = await db.execute(stmt)
     if res.scalar_one_or_none():
         raise HTTPException(400, "Bu email allaqachon ro'yxatdan o'tgan.")
-    
     curr = user.currency.upper()
     if curr not in ["USD", "EUR", "BTC", "SOL"]:
         curr = "USD"
     rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
-    initial_balance = 25000.0 * rates.get(curr, 1.0)
-    
+    balance = 25000.0 * rates.get(curr, 1.0)
     new_user = User(
         username=user.username,
         email=user.email,
         password_hash=hash_password(user.password),
         currency=curr,
-        balance=initial_balance
+        balance=balance
     )
     db.add(new_user)
     await db.commit()
@@ -417,9 +272,7 @@ async def signin(user: UserLogin, db: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.username == user.username)
     res = await db.execute(stmt)
     db_user = res.scalar_one_or_none()
-    if not db_user:
-        raise HTTPException(400, "Noto'g'ri username yoki parol.")
-    if not verify_password(user.password, db_user.password_hash):
+    if not db_user or not verify_password(user.password, db_user.password_hash):
         raise HTTPException(400, "Noto'g'ri username yoki parol.")
     return {
         "status": "success",
@@ -433,7 +286,7 @@ async def signin(user: UserLogin, db: AsyncSession = Depends(get_db)):
         "bio": db_user.bio
     }
 
-# ===== PROFILE =====
+# PROFILE
 @app.get("/api/v2/profile/{username}")
 async def get_profile(username: str, db: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.username == username)
@@ -461,21 +314,7 @@ async def get_profile(username: str, db: AsyncSession = Depends(get_db)):
         "registered_at": user.registered_at.isoformat() if user.registered_at else None
     }
 
-@app.post("/api/v2/profile/update")
-async def update_profile(req: ProfileUpdate, db: AsyncSession = Depends(get_db)):
-    stmt = select(User).where(User.username == req.username)
-    res = await db.execute(stmt)
-    user = res.scalar_one_or_none()
-    if not user:
-        raise HTTPException(404, "Foydalanuvchi topilmadi.")
-    update_data = req.dict(exclude_unset=True, exclude={"username"})
-    for key, value in update_data.items():
-        if value is not None:
-            setattr(user, key, value)
-    await db.commit()
-    return {"success": True}
-
-# ===== SOCIAL =====
+# SOCIAL
 @app.get("/api/v2/social/posts")
 async def get_social_posts(db: AsyncSession = Depends(get_db)):
     stmt = select(SocialPost).order_by(SocialPost.timestamp.desc()).limit(100)
@@ -527,45 +366,7 @@ async def comment_post(req: CommentRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
     return {"success": True, "comment": comments[-1]}
 
-@app.post("/api/v2/social/repost")
-async def repost_post(req: LikeRequest, db: AsyncSession = Depends(get_db)):
-    stmt = select(SocialPost).where(SocialPost.id == req.post_id)
-    res = await db.execute(stmt)
-    original = res.scalar_one_or_none()
-    if not original:
-        raise HTTPException(404, "Post topilmadi.")
-    new_post = SocialPost(
-        id=generate_post_id(),
-        username=req.username,
-        content=f"🔁 Repost: {original.content}",
-        timestamp=datetime.now().strftime("%H:%M:%S"),
-        likes=0,
-        comments=[],
-        is_ai=False
-    )
-    db.add(new_post)
-    await db.commit()
-    return {"success": True, "repost": {"id": new_post.id, "username": new_post.username, "content": new_post.content, "timestamp": new_post.timestamp}}
-
-@app.post("/api/v2/social/follow")
-async def follow_user(req: FollowRequest, db: AsyncSession = Depends(get_db)):
-    if req.username == req.target:
-        return {"success": False, "message": "O'zingizni kuzata olmaysiz."}
-    stmt = select(User).where(User.username.in_([req.username, req.target]))
-    res = await db.execute(stmt)
-    users = res.scalars().all()
-    if len(users) != 2:
-        raise HTTPException(404, "Foydalanuvchi topilmadi.")
-    stmt = select(Follow).where(Follow.follower == req.username, Follow.following == req.target)
-    res = await db.execute(stmt)
-    if res.scalar_one_or_none():
-        return {"success": False, "message": "Siz allaqachon bu foydalanuvchini kuzatasiz."}
-    follow = Follow(follower=req.username, following=req.target)
-    db.add(follow)
-    await db.commit()
-    return {"success": True, "message": f"{req.target} ni kuzatish boshlandi."}
-
-# ===== NOTIFICATIONS =====
+# NOTIFICATIONS
 @app.get("/api/v2/notifications/{username}")
 async def get_notifications(username: str, db: AsyncSession = Depends(get_db)):
     stmt = select(Notification).where(Notification.username == username).order_by(Notification.timestamp.desc()).limit(20)
@@ -577,13 +378,12 @@ async def get_notifications(username: str, db: AsyncSession = Depends(get_db)):
 async def mark_notifications_read(username: str, db: AsyncSession = Depends(get_db)):
     stmt = select(Notification).where(Notification.username == username, Notification.read == False)
     res = await db.execute(stmt)
-    notifs = res.scalars().all()
-    for n in notifs:
+    for n in res.scalars().all():
         n.read = True
     await db.commit()
     return {"success": True}
 
-# ===== AI CHAT =====
+# AI CHAT
 @app.post("/api/v2/ai/chat")
 async def ai_chat(req: AIChatRequest, db: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.username == req.username)
@@ -591,9 +391,7 @@ async def ai_chat(req: AIChatRequest, db: AsyncSession = Depends(get_db)):
     user = res.scalar_one_or_none()
     if not user:
         raise HTTPException(404, "Foydalanuvchi topilmadi.")
-    chat_price = 49.0
-    rate = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
-    price = chat_price * rate.get(user.currency, 1.0)
+    price = 49.0 * {"USD":1.0, "EUR":0.92, "BTC":0.000015, "SOL":0.0075}.get(user.currency, 1.0)
     if user.balance < price:
         return {"success": False, "message": f"⚠️ AI chat uchun ${price:.2f} kerak."}
     user.balance -= price
@@ -604,7 +402,7 @@ async def ai_chat(req: AIChatRequest, db: AsyncSession = Depends(get_db)):
         ai_response = "🧬 Simptomlaringiz virusli infeksiyaga o'xshaydi. 3 kun dam oling va ko'p suv iching."
     return {"success": True, "response": ai_response, "new_balance": user.balance, "deducted": price}
 
-# ===== CAMERA =====
+# CAMERA
 @app.post("/api/v2/camera/analyze")
 async def camera_analyze(req: CameraAnalysisRequest, db: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.username == req.username)
@@ -633,7 +431,7 @@ async def camera_analyze(req: CameraAnalysisRequest, db: AsyncSession = Depends(
             analysis = f"🔬 Rasm tahlilida xatolik: {e}"
     return {"success": True, "analysis": analysis, "new_balance": user.balance, "deducted": price}
 
-# ===== HEALTH RANKING =====
+# HEALTH RANKING
 @app.get("/api/v2/health/ranking")
 async def get_health_ranking(db: AsyncSession = Depends(get_db)):
     stmt = select(User).order_by(User.health_score.desc())
@@ -641,7 +439,7 @@ async def get_health_ranking(db: AsyncSession = Depends(get_db)):
     users = res.scalars().all()
     return [{"username": u.username, "health_score": u.health_score, "status": u.status, "avatar": u.avatar} for u in users]
 
-# ===== STATS =====
+# STATS
 @app.get("/api/v2/system/stats")
 async def get_system_stats(db: AsyncSession = Depends(get_db)):
     stmt = select(User)
@@ -663,7 +461,7 @@ async def get_system_stats(db: AsyncSession = Depends(get_db)):
         "total_social_posts": total_posts
     }
 
-# ===== AI ADS =====
+# AI ADS
 @app.get("/api/v2/ai/ads-performance")
 async def get_ads_performance(db: AsyncSession = Depends(get_db)):
     stmt = select(AdsPerformance)
@@ -671,7 +469,7 @@ async def get_ads_performance(db: AsyncSession = Depends(get_db)):
     ads = res.scalars().all()
     return {a.campaign_id: {"product_name": a.product_name, "type": a.type, "conversions": a.conversions, "impressions": a.impressions, "ctr": a.ctr, "roi": a.roi, "budget": a.budget, "spent": a.spent, "active": a.active} for a in ads}
 
-# ===== ADMIN =====
+# ADMIN
 ADMIN_USERNAME = "CEO"
 ADMIN_PASSWORD_HASH = hash_password("12345678")
 
@@ -700,7 +498,7 @@ async def admin_dashboard(username: str = None, password: str = None, db: AsyncS
         "total_sales": len(sales)
     }
 
-# ===== CEO =====
+# CEO
 @app.get("/api/v2/ceo/dashboard")
 async def ceo_dashboard(username: str = None, password: str = None, db: AsyncSession = Depends(get_db)):
     if username != ADMIN_USERNAME or not verify_password(password or "", ADMIN_PASSWORD_HASH):
@@ -710,7 +508,7 @@ async def ceo_dashboard(username: str = None, password: str = None, db: AsyncSes
     ideas = res.scalars().all()
     return {"insights": [{"timestamp": i.timestamp.isoformat(), "content": i.content} for i in ideas]}
 
-# ===== WEBSOCKET =====
+# WEBSOCKET
 @app.websocket("/ws/notifications")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
@@ -720,9 +518,7 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
-# ==========================================
-# STARTUP – TABELLARNI YARATISH
-# ==========================================
+# ===== STARTUP =====
 @app.on_event("startup")
 async def startup():
     async with engine.begin() as conn:
@@ -730,16 +526,7 @@ async def startup():
     print("✅ Baza jadvallari yaratildi.")
     print("🚀 BioEmpire V12 ishga tushdi!")
 
-# ==========================================
-# HTML (FALLBACK)
-# ==========================================
-HTML = """<!DOCTYPE html>
-<html><body><h1>🧬 BioEmpire V12</h1><p>Ro'yxatdan o'tish ixtiyoriy, o'ng tomonda.</p></body></html>
-"""
-
-# ==========================================
-# SERVER
-# ==========================================
+# ===== SERVER =====
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5050))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
