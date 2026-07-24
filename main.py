@@ -416,7 +416,6 @@ async def camera_analyze(req: CameraAnalysisRequest):
             except Exception as e:
                 analysis_result = f"🔬 Rasm tahlilida xatolik: {e}"
         else:
-            # Fallback to text AI
             messages = [
                 {"role": "system", "content": "Siz BioEmpire AI analistisisiz. Rasm tahlili natijasini berasiz."},
                 {"role": "user", "content": "Rasmda teri toshmasi ko'rinadi. Diagnostika bering."}
