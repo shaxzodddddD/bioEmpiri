@@ -8,8 +8,8 @@ import httpx
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
-from fastapi import FastAPI, Request, HTTPException, Depends
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -39,6 +39,9 @@ GROQ_MODEL = CONFIG.get("api", {}).get("groq_model", "mixtral-8x7b-32768")
 
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
+    print("✅ Gemini API sozlandi")
+else:
+    print("⚠️ Gemini API sozlanmadi")
 
 app = FastAPI(title="BioEmpire V13")
 app.add_middleware(
@@ -227,7 +230,6 @@ async def signup(user: UserRegister):
     async with db_lock:
         if user.username in db["users"]:
             raise HTTPException(status_code=400, detail="Bu username allaqachon band.")
-        # Check email uniqueness
         for u in db["users"].values():
             if u.get("email") == user.email:
                 raise HTTPException(status_code=400, detail="Bu email allaqachon ro'yxatdan o'tgan.")
@@ -251,7 +253,6 @@ async def signup(user: UserRegister):
         }
         db["system_vault"]["active_users"] = len(db["users"])
         save_db(db)
-        # Welcome notification
         notif = generate_notification(user.username, "🎉 Xush kelibsiz! BioEmpire tizimiga muvaffaqiyatli ro'yxatdan o'tdingiz.")
         add_notification(notif)
         return {
@@ -269,7 +270,6 @@ async def signin(user: UserLogin):
         target = db["users"][user.username]
         if target["password_hash"] != hash_password(user.password):
             raise HTTPException(status_code=400, detail="Noto'g'ri username yoki parol.")
-        # Update last activity
         track_user_activity(user.username, "signin")
         return {
             "status": "success",
@@ -356,7 +356,6 @@ async def ai_chat(req: AIChatRequest):
         if req.username not in db["users"]:
             raise HTTPException(404, "Foydalanuvchi topilmadi.")
         user = db["users"][req.username]
-        # Deduct tokens/balance (simulated)
         chat_price = 49.0
         rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
         price = chat_price * rates.get(user["currency"], 1.0)
@@ -367,14 +366,12 @@ async def ai_chat(req: AIChatRequest):
         save_db(db)
         track_user_activity(req.username, "ai_chat", {"message": req.message[:50]})
 
-        # Call AI
         messages = [
             {"role": "system", "content": "Siz BioEmpire AI shifokorisiz. Kasalliklar haqida batafsil ma'lumot bering va davolash usullarini tavsiya qiling."},
             {"role": "user", "content": req.message}
         ]
         ai_response = await call_ai_api(messages)
         if not ai_response:
-            # Fallback
             fallbacks = [
                 "🧬 Sizning simptomlaringiz virusli infeksiyaga o'xshaydi. 3 kun dam oling va ko'p suv iching.",
                 "🩺 Tahlillar natijasiga ko'ra, immun tizim zaifligi aniqlangan. ImmunoBoost Pro tavsiya etiladi.",
@@ -466,7 +463,6 @@ async def get_notifications(username: str):
     async with db_lock:
         if username not in db["users"]:
             raise HTTPException(404, "Foydalanuvchi topilmadi.")
-        # Return only this user's notifications
         user_notifs = [n for n in db.get("notifications", []) if n["username"] == username]
         return user_notifs
 
@@ -504,11 +500,6 @@ async def admin_dashboard(username: str = None, password: str = None):
         "active_users": db["system_vault"]["active_users"],
         "total_sales": len(db.get("product_sales", []))
     }
-
-# ==========================================
-# BACKGROUND TASKS (Optional)
-# ==========================================
-# These can be enabled as needed; for simplicity, we skip.
 
 # ==========================================
 # SERVER
