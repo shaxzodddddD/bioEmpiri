@@ -1,73 +1,115 @@
 <!DOCTYPE html>
 <html lang="uz">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>🧬 BioEmpire V13</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com">
+    </script>
     <style>
+        /* ─── ROOT ─── */
         :root {
-            --bg-primary: #E8F5E9;
+            --bg: #E8F5E9;
             --accent: #66BB6A;
             --accent-dark: #43A047;
             --gold: #FFB300;
-            --cyber-red: #E53935;
-            --text-dark: #1B3A1B;
-            --text-muted: #4A6A4A;
-            --glass-bg: rgba(255,255,255,0.85);
-            --glass-border: rgba(102,187,106,0.3);
-            --shadow: 0 8px 32px rgba(0,40,0,0.08);
+            --red: #E53935;
+            --text: #1B3A1B;
+            --muted: #4A6A4A;
+            --glass: rgba(255, 255, 255, 0.85);
+            --border: rgba(102, 187, 106, 0.3);
+            --shadow: 0 8px 32px rgba(0, 40, 0, 0.08);
         }
-        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',system-ui,sans-serif; }
-        body { background: var(--bg-primary); color: var(--text-dark); min-height:100vh; }
 
-        /* ===== GLASS ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ─── GLASS ─── */
         .glass {
-            background: var(--glass-bg);
+            background: var(--glass);
             backdrop-filter: blur(8px);
-            border: 1px solid var(--glass-border);
+            border: 1px solid var(--border);
             border-radius: 20px;
             box-shadow: var(--shadow);
+            padding: 20px;
             transition: all 0.25s;
-            padding:20px;
         }
-        .glass:hover { box-shadow:0 12px 40px rgba(0,40,0,0.12); }
+        .glass:hover {
+            box-shadow: 0 12px 40px rgba(0, 40, 0, 0.12);
+        }
 
-        /* ===== BUTTONS ===== */
-        .btn-cyber {
-            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-            border: none; color: white; font-weight: 700; padding: 10px 24px;
-            border-radius: 12px; cursor: pointer; transition: 0.25s;
-            font-size: 14px; letter-spacing: 0.3px;
-            box-shadow: 0 4px 16px rgba(102,187,106,0.25);
+        /* ─── BUTTONS ─── */
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.25s;
+            font-size: 14px;
+            letter-spacing: 0.3px;
         }
-        .btn-cyber:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(102,187,106,0.35); }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(102, 187, 106, 0.25);
+        }
+        .btn-primary:hover {
+            box-shadow: 0 8px 28px rgba(102, 187, 106, 0.35);
+        }
         .btn-gold {
             background: linear-gradient(135deg, var(--gold), #F9A825);
             color: #1B3A1B;
-            box-shadow: 0 4px 16px rgba(255,179,0,0.25);
+            box-shadow: 0 4px 16px rgba(255, 179, 0, 0.25);
         }
-        .btn-gold:hover { box-shadow: 0 8px 28px rgba(255,179,0,0.35); }
+        .btn-gold:hover {
+            box-shadow: 0 8px 28px rgba(255, 179, 0, 0.35);
+        }
         .btn-red {
-            background: linear-gradient(135deg, var(--cyber-red), #C62828);
-            color: white;
-            box-shadow: 0 4px 16px rgba(229,57,53,0.25);
+            background: linear-gradient(135deg, var(--red), #C62828);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(229, 57, 53, 0.25);
         }
-        .btn-red:hover { box-shadow: 0 8px 28px rgba(229,57,53,0.35); }
+        .btn-red:hover {
+            box-shadow: 0 8px 28px rgba(229, 57, 53, 0.35);
+        }
         .btn-outline {
-            background: transparent; border: 2px solid var(--accent);
-            color: var(--accent-dark); padding: 8px 18px; border-radius: 12px;
-            cursor: pointer; transition: 0.2s; font-weight: 600;
+            background: transparent;
+            border: 2px solid var(--accent);
+            color: var(--accent-dark);
         }
-        .btn-outline:hover { background: rgba(102,187,106,0.08); }
-        .btn-sm { padding: 6px 16px; font-size: 12px; border-radius: 10px; }
-        .btn-xs { padding: 4px 12px; font-size: 11px; border-radius: 8px; }
+        .btn-outline:hover {
+            background: rgba(102, 187, 106, 0.08);
+        }
+        .btn-sm {
+            padding: 6px 16px;
+            font-size: 12px;
+            border-radius: 10px;
+        }
+        .btn-xs {
+            padding: 4px 12px;
+            font-size: 11px;
+            border-radius: 8px;
+        }
 
-        /* ===== HEADER ===== */
+        /* ─── HEADER ─── */
         header {
-            background: rgba(255,255,255,0.95);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--glass-border);
+            border-bottom: 1px solid var(--border);
             padding: 10px 24px;
             display: flex;
             align-items: center;
@@ -87,9 +129,11 @@
             gap: 8px;
             cursor: pointer;
         }
-        .logo span { font-size: 28px; }
+        .logo span {
+            font-size: 28px;
+        }
 
-        /* ===== AUTH IN HEADER (right side) ===== */
+        /* ─── AUTH (right side) ─── */
         .auth-section {
             display: flex;
             align-items: center;
@@ -117,38 +161,54 @@
             border: 2px solid var(--gold);
             flex-shrink: 0;
         }
-        .user-name { font-weight: 600; font-size: 14px; color: var(--text-dark); }
-        .user-balance { font-size: 13px; color: var(--accent-dark); font-weight: 700; }
+        .user-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text);
+        }
+        .user-balance {
+            font-size: 13px;
+            color: var(--accent-dark);
+            font-weight: 700;
+        }
 
-        /* ===== AUTH MODAL ===== */
+        /* ─── AUTH MODAL ─── */
         #auth-modal {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(8px);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 99999;
         }
-        #auth-modal.show { display: flex; }
+        #auth-modal.show {
+            display: flex;
+        }
         .auth-card {
-            background: white;
+            background: #fff;
             border-radius: 28px;
             padding: 36px 32px;
             width: 100%;
             max-width: 420px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
             animation: modalIn 0.3s ease;
             max-height: 90vh;
             overflow-y: auto;
         }
         @keyframes modalIn {
-            0% { transform: scale(0.9) translateY(20px); opacity: 0; }
-            100% { transform: scale(1) translateY(0); opacity: 1; }
+            0% {
+                transform: scale(0.9) translateY(20px);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1) translateY(0);
+                opacity: 1;
+            }
         }
         .auth-card h2 {
-            color: var(--text-dark);
+            color: var(--text);
             text-align: center;
             font-size: 22px;
             font-weight: 800;
@@ -157,13 +217,15 @@
             float: right;
             font-size: 28px;
             cursor: pointer;
-            color: var(--text-muted);
+            color: var(--muted);
             transition: 0.2s;
             line-height: 1;
             background: none;
             border: none;
         }
-        .auth-card .close-modal:hover { color: var(--cyber-red); }
+        .auth-card .close-modal:hover {
+            color: var(--red);
+        }
         .auth-tabs {
             display: flex;
             gap: 8px;
@@ -176,7 +238,7 @@
             cursor: pointer;
             border: 2px solid transparent;
             font-weight: 700;
-            color: var(--text-muted);
+            color: var(--muted);
             transition: 0.3s;
             font-size: 14px;
             background: none;
@@ -184,10 +246,14 @@
         .auth-tab.active {
             border-color: var(--accent);
             color: var(--accent-dark);
-            background: rgba(102,187,106,0.08);
+            background: rgba(102, 187, 106, 0.08);
         }
-        .auth-tab:hover { color: var(--text-dark); }
-        .input-group { margin-bottom: 14px; }
+        .auth-tab:hover {
+            color: var(--text);
+        }
+        .input-group {
+            margin-bottom: 14px;
+        }
         .input-group label {
             display: block;
             font-size: 12px;
@@ -199,9 +265,9 @@
         .input-group select {
             width: 100%;
             background: #f5faf5;
-            border: 1.5px solid var(--glass-border);
+            border: 1.5px solid var(--border);
             padding: 10px 14px;
-            color: var(--text-dark);
+            color: var(--text);
             border-radius: 12px;
             outline: none;
             font-size: 14px;
@@ -209,22 +275,22 @@
         .input-group input:focus,
         .input-group select:focus {
             border-color: var(--accent);
-            box-shadow: 0 0 0 4px rgba(102,187,106,0.1);
+            box-shadow: 0 0 0 4px rgba(102, 187, 106, 0.1);
         }
         .auth-error {
-            color: var(--cyber-red);
+            color: var(--red);
             font-size: 12px;
             margin-top: 8px;
             text-align: center;
         }
 
-        /* ===== SIDEBAR ===== */
+        /* ─── SIDEBAR ─── */
         .sidebar {
             width: 240px;
             flex-shrink: 0;
-            background: rgba(255,255,255,0.92);
+            background: rgba(255, 255, 255, 0.92);
             backdrop-filter: blur(12px);
-            border-right: 1px solid var(--glass-border);
+            border-right: 1px solid var(--border);
             height: calc(100vh - 72px);
             overflow-y: auto;
             padding: 16px 12px;
@@ -240,7 +306,7 @@
             background: transparent;
             border: 1px solid transparent;
             border-radius: 14px;
-            color: var(--text-muted);
+            color: var(--muted);
             cursor: pointer;
             transition: 0.2s;
             font-size: 14px;
@@ -248,44 +314,86 @@
             margin-bottom: 2px;
         }
         .sidebar-btn:hover {
-            background: rgba(102,187,106,0.06);
-            border-color: var(--glass-border);
-            color: var(--text-dark);
+            background: rgba(102, 187, 106, 0.06);
+            border-color: var(--border);
+            color: var(--text);
         }
         .sidebar-btn.active {
-            background: rgba(102,187,106,0.1);
+            background: rgba(102, 187, 106, 0.1);
             border-color: var(--accent);
             color: var(--accent-dark);
             font-weight: 600;
         }
-        .sidebar-btn .icon { font-size: 20px; width: 28px; text-align: center; }
+        .sidebar-btn .icon {
+            font-size: 20px;
+            width: 28px;
+            text-align: center;
+        }
         .sidebar-btn .badge {
             margin-left: auto;
-            background: var(--cyber-red);
-            color: white;
+            background: var(--red);
+            color: #fff;
             font-size: 10px;
             padding: 0 8px;
             border-radius: 30px;
             font-weight: 700;
         }
         .sidebar-divider {
-            border-top: 1px solid var(--glass-border);
+            border-top: 1px solid var(--border);
             margin: 10px 0 12px;
         }
 
-        /* ===== PANELS ===== */
-        .panel { display: none; animation: fadeSlide 0.3s ease; }
-        .panel.active { display: block; }
+        /* ─── PANELS ─── */
+        .panel {
+            display: none;
+            animation: fadeSlide 0.3s ease;
+        }
+        .panel.active {
+            display: block;
+        }
         @keyframes fadeSlide {
-            0% { opacity:0; transform:translateY(10px); }
-            100% { opacity:1; transform:translateY(0); }
+            0% {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
-        /* ===== CHAT ===== */
+        /* ─── LOCK OVERLAY ─── */
+        .lock-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 20px;
+            z-index: 10;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 200px;
+        }
+        .lock-overlay .lock-icon {
+            font-size: 48px;
+        }
+        .lock-overlay p {
+            color: var(--muted);
+            font-weight: 600;
+        }
+        .panel-wrapper {
+            position: relative;
+            min-height: 200px;
+        }
+
+        /* ─── CHAT ─── */
         .chat-terminal {
             height: 200px;
             background: #f9fbf9;
-            border: 1px solid var(--glass-border);
+            border: 1px solid var(--border);
             border-radius: 14px;
             padding: 12px 16px;
             overflow-y: auto;
@@ -298,43 +406,52 @@
             max-width: 90%;
         }
         .chat-msg.ai {
-            background: rgba(102,187,106,0.08);
+            background: rgba(102, 187, 106, 0.08);
             border-left: 3px solid var(--accent);
         }
         .chat-msg.user {
-            background: rgba(255,179,0,0.08);
+            background: rgba(255, 179, 0, 0.08);
             border-right: 3px solid var(--gold);
             text-align: right;
             margin-left: auto;
         }
         .chat-msg.warning {
-            background: rgba(229,57,53,0.08);
-            border-left: 3px solid var(--cyber-red);
+            background: rgba(229, 57, 53, 0.08);
+            border-left: 3px solid var(--red);
             color: #B71C1C;
         }
 
-        /* ===== FEED ===== */
+        /* ─── FEED ─── */
         .feed-item {
-            background: rgba(255,255,255,0.6);
-            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid var(--border);
             padding: 12px 16px;
             border-radius: 14px;
             margin-bottom: 10px;
             border-left: 4px solid var(--accent);
         }
-        .feed-item .user { color: var(--accent-dark); font-weight: 700; }
-        .feed-item .time { color: var(--text-muted); font-size: 11px; float: right; }
+        .feed-item .user {
+            color: var(--accent-dark);
+            font-weight: 700;
+        }
+        .feed-item .time {
+            color: var(--muted);
+            font-size: 11px;
+            float: right;
+        }
         .feed-item .actions {
             margin-top: 8px;
             display: flex;
             gap: 16px;
             font-size: 13px;
-            color: var(--text-muted);
+            color: var(--muted);
             cursor: pointer;
         }
-        .feed-item .actions span:hover { color: var(--accent-dark); }
+        .feed-item .actions span:hover {
+            color: var(--accent-dark);
+        }
 
-        /* ===== PACKAGES ===== */
+        /* ─── PACKAGES ─── */
         .package-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -342,8 +459,8 @@
             margin-top: 14px;
         }
         .package-card {
-            background: white;
-            border: 1px solid rgba(255,179,0,0.15);
+            background: #fff;
+            border: 1px solid rgba(255, 179, 0, 0.15);
             border-radius: 14px;
             padding: 14px 8px;
             text-align: center;
@@ -353,32 +470,48 @@
         .package-card:hover {
             border-color: var(--gold);
             transform: translateY(-4px);
-            box-shadow: 0 8px 24px rgba(255,179,0,0.08);
+            box-shadow: 0 8px 24px rgba(255, 179, 0, 0.08);
         }
-        .package-card .pkg-name { font-size: 12px; font-weight: 700; }
-        .package-card .pkg-price { color: var(--gold); font-size: 15px; font-weight: 800; }
+        .package-card .pkg-name {
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .package-card .pkg-price {
+            color: var(--gold);
+            font-size: 15px;
+            font-weight: 800;
+        }
 
-        /* ===== RANKING ===== */
+        /* ─── RANKING ─── */
         .ranking-item {
             display: flex;
             align-items: center;
             gap: 12px;
             padding: 6px 12px;
-            border-bottom: 1px solid var(--glass-border);
+            border-bottom: 1px solid var(--border);
             font-size: 14px;
         }
-        .ranking-item .pos { color: var(--gold); font-weight: 700; width: 30px; }
-        .ranking-item .name { flex: 1; }
-        .ranking-item .score { color: var(--accent-dark); font-weight: 700; }
+        .ranking-item .pos {
+            color: var(--gold);
+            font-weight: 700;
+            width: 30px;
+        }
+        .ranking-item .name {
+            flex: 1;
+        }
+        .ranking-item .score {
+            color: var(--accent-dark);
+            font-weight: 700;
+        }
 
-        /* ===== CAMERA ===== */
+        /* ─── CAMERA ─── */
         #camera-preview {
             width: 100%;
             max-height: 240px;
             border-radius: 16px;
             background: #000;
             object-fit: cover;
-            border: 2px solid var(--glass-border);
+            border: 2px solid var(--border);
         }
         .voice-indicator {
             display: inline-block;
@@ -390,11 +523,18 @@
             animation: pulse-dot 1s infinite;
         }
         @keyframes pulse-dot {
-            0%,100% { opacity:0.4; transform:scale(0.9); }
-            50% { opacity:1; transform:scale(1.2); }
+            0%,
+            100% {
+                opacity: 0.4;
+                transform: scale(0.9);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
         }
 
-        /* ===== STATUS BADGES ===== */
+        /* ─── STATUS BADGES ─── */
         .status-badge {
             display: inline-block;
             padding: 2px 12px;
@@ -402,10 +542,22 @@
             font-size: 11px;
             font-weight: 700;
         }
-        .status-warning { background: #FFB300; color: #1B3A1B; }
-        .status-red { background: var(--cyber-red); color: white; }
-        .status-optimized { background: var(--accent); color: white; }
-        .status-immortal { background: var(--gold); color: #1B3A1B; }
+        .status-warning {
+            background: #FFB300;
+            color: #1B3A1B;
+        }
+        .status-red {
+            background: var(--red);
+            color: #fff;
+        }
+        .status-optimized {
+            background: var(--accent);
+            color: #fff;
+        }
+        .status-immortal {
+            background: var(--gold);
+            color: #1B3A1B;
+        }
 
         .avatar-lg {
             width: 52px;
@@ -420,7 +572,7 @@
             flex-shrink: 0;
         }
 
-        /* ===== NOTIFICATIONS ===== */
+        /* ─── NOTIFICATIONS ─── */
         .notif-bell {
             position: relative;
             cursor: pointer;
@@ -430,8 +582,8 @@
             position: absolute;
             top: -6px;
             right: -8px;
-            background: var(--cyber-red);
-            color: white;
+            background: var(--red);
+            color: #fff;
             border-radius: 50%;
             padding: 0 6px;
             font-size: 10px;
@@ -441,8 +593,13 @@
             animation: pulse-badge 1.8s infinite;
         }
         @keyframes pulse-badge {
-            0%,100% { transform:scale(1); }
-            50% { transform:scale(1.15); }
+            0%,
+            100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.15);
+            }
         }
         .notif-dropdown {
             position: absolute;
@@ -451,87 +608,113 @@
             width: 300px;
             max-height: 320px;
             overflow-y: auto;
-            background: white;
-            border: 1px solid var(--glass-border);
+            background: #fff;
+            border: 1px solid var(--border);
             border-radius: 16px;
             padding: 14px;
             display: none;
             z-index: 200;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.06);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.06);
         }
-        .notif-dropdown.show { display: block; }
+        .notif-dropdown.show {
+            display: block;
+        }
         .notif-item {
             padding: 8px 10px;
-            border-bottom: 1px solid var(--glass-border);
+            border-bottom: 1px solid var(--border);
             font-size: 13px;
         }
         .notif-item .time {
-            color: var(--text-muted);
+            color: var(--muted);
             font-size: 11px;
             float: right;
         }
-        .notif-item.unread { border-left: 3px solid var(--accent); }
-
-        /* ===== LOCK OVERLAY ===== */
-        .lock-overlay {
-            position: absolute;
-            inset: 0;
-            background: rgba(255,255,255,0.6);
-            backdrop-filter: blur(4px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 20px;
-            z-index: 10;
-            flex-direction: column;
-            gap: 12px;
-            min-height: 200px;
-        }
-        .lock-overlay .lock-icon { font-size: 48px; }
-        .lock-overlay p { color: var(--text-muted); font-weight: 600; }
-
-        .panel-wrapper {
-            position: relative;
-            min-height: 200px;
+        .notif-item.unread {
+            border-left: 3px solid var(--accent);
         }
 
-        /* ===== RESPONSIVE ===== */
-        @media (max-width:1024px) {
-            .sidebar { width: 70px !important; padding: 10px 6px; }
-            .sidebar .btn-text { display: none; }
-            .sidebar .icon { font-size: 24px; width: 100%; text-align: center; }
-            .sidebar .badge { display: none; }
-        }
-        @media (max-width:768px) {
-            .sidebar { display: none; }
-            header { padding: 8px 16px; flex-direction: column; align-items: stretch; gap: 6px; }
-            .logo { font-size: 20px; justify-content: center; }
-            .auth-section { justify-content: center; flex-wrap: wrap; }
-            .auth-section .auth-buttons .btn-text { display: none; }
-            .auth-card { margin: 16px; padding: 24px 20px; }
-        }
-
+        /* ─── ADMIN STATS ─── */
         .admin-stat {
-            background: white;
-            border: 1px solid var(--glass-border);
+            background: #fff;
+            border: 1px solid var(--border);
             border-radius: 16px;
             padding: 16px;
             text-align: center;
         }
-        .admin-stat .value { font-size: 28px; font-weight: 900; color: var(--accent-dark); }
-        .admin-stat .label { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+        .admin-stat .value {
+            font-size: 28px;
+            font-weight: 900;
+            color: var(--accent-dark);
+        }
+        .admin-stat .label {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 600;
+        }
 
-        /* scroll */
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: var(--bg-primary); }
-        ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 20px; }
+        /* ─── SCROLL ─── */
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent);
+            border-radius: 20px;
+        }
+
+        /* ─── RESPONSIVE ─── */
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 70px !important;
+                padding: 10px 6px;
+            }
+            .sidebar .btn-text {
+                display: none;
+            }
+            .sidebar .icon {
+                font-size: 24px;
+                width: 100%;
+                text-align: center;
+            }
+            .sidebar .badge {
+                display: none;
+            }
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+            header {
+                padding: 8px 16px;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 6px;
+            }
+            .logo {
+                font-size: 20px;
+                justify-content: center;
+            }
+            .auth-section {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            .auth-section .auth-buttons .btn-text {
+                display: none;
+            }
+            .auth-card {
+                margin: 16px;
+                padding: 24px 20px;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <!-- ============================================================ -->
-    <!-- AUTH MODAL (login/register) -->
-    <!-- ============================================================ -->
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- AUTH MODAL -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <div id="auth-modal">
         <div class="auth-card">
             <button class="close-modal" onclick="closeAuthModal()">✕</button>
@@ -562,18 +745,18 @@
                     <option value="SOL">SOL</option>
                 </select>
             </div>
-            <button class="btn-cyber w-full" onclick="executeAuth()">🚀 TIZIMNI FAOLASHTIRISH</button>
+            <button class="btn btn-primary w-full" onclick="executeAuth()">🚀 TIZIMNI FAOLASHTIRISH</button>
             <p id="auth-error" class="auth-error"></p>
             <div class="text-center mt-3 text-xs text-gray-500">Admin: CEO / parol: 12345678</div>
         </div>
     </div>
 
-    <!-- ============================================================ -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <!-- MAIN APP -->
-    <!-- ============================================================ -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <div id="main-app" style="display:none;">
 
-        <!-- ===== HEADER ===== -->
+        <!-- ─── HEADER ─── -->
         <header>
             <div class="logo" onclick="location.reload()">
                 <span>🧬</span> BioEmpire ∞
@@ -583,8 +766,8 @@
             <div class="auth-section" id="header-auth-section">
                 <!-- Not logged in: show login/register buttons -->
                 <div id="auth-buttons" class="auth-buttons">
-                    <button class="btn-cyber btn-sm" onclick="openAuthModal('signin')">🔑 Kirish</button>
-                    <button class="btn-gold btn-sm" onclick="openAuthModal('signup')">📝 Ro'yxatdan o'tish</button>
+                    <button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">🔑 Kirish</button>
+                    <button class="btn btn-gold btn-sm" onclick="openAuthModal('signup')">📝 Ro'yxatdan o'tish</button>
                 </div>
 
                 <!-- Logged in: show user info -->
@@ -600,15 +783,15 @@
                     <div class="user-avatar" id="header-avatar">🧬</div>
                     <span class="user-name" id="header-username">-</span>
                     <span class="user-balance" id="header-balance">$0</span>
-                    <button class="btn-red btn-xs" onclick="logout()">Chiqish</button>
+                    <button class="btn btn-red btn-xs" onclick="logout()">Chiqish</button>
                 </div>
             </div>
         </header>
 
-        <!-- ===== BODY ===== -->
+        <!-- ─── BODY ─── -->
         <div class="flex">
 
-            <!-- ===== SIDEBAR ===== -->
+            <!-- ─── SIDEBAR ─── -->
             <aside class="sidebar" id="main-sidebar">
                 <div class="flex items-center gap-3 p-3 rounded-xl bg-[#F1F8E9] border border-[#66BB6A33] mb-4">
                     <div class="avatar-lg" id="sidebar-avatar">🧬</div>
@@ -646,7 +829,7 @@
                 </button>
             </aside>
 
-            <!-- ===== CONTENT ===== -->
+            <!-- ─── CONTENT ─── -->
             <main class="flex-1 min-w-0 p-4 max-w-full">
 
                 <!-- PANEL: Konsultatsiya -->
@@ -655,23 +838,23 @@
                         <div id="consult-lock" class="lock-overlay" style="display:none;">
                             <div class="lock-icon">🔒</div>
                             <p>Iltimos, avval tizimga kiring</p>
-                            <button class="btn-cyber btn-sm" onclick="openAuthModal('signin')">Kirish</button>
+                            <button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button>
                         </div>
                         <div id="consult-content">
                             <h2 class="text-xl font-bold text-[#43A047] mb-3">🩺 AI KONSULTATSIYA</h2>
                             <div class="mb-4">
                                 <div class="flex gap-2 flex-wrap">
-                                    <button class="btn-cyber btn-sm" onclick="startCamera()">📷 Kamerani yoqish</button>
-                                    <button class="btn-gold btn-sm" onclick="captureAndAnalyze()">🔬 Suratga olib tahlil</button>
-                                    <button class="btn-red btn-sm" onclick="stopCamera()">⏹ To'xtatish</button>
+                                    <button class="btn btn-primary btn-sm" onclick="startCamera()">📷 Kamerani yoqish</button>
+                                    <button class="btn btn-gold btn-sm" onclick="captureAndAnalyze()">🔬 Suratga olib tahlil</button>
+                                    <button class="btn btn-red btn-sm" onclick="stopCamera()">⏹ To'xtatish</button>
                                 </div>
                                 <video id="camera-preview" autoplay playsinline style="display:none;"></video>
                                 <div id="camera-placeholder" class="bg-gray-100 rounded-xl p-4 text-center text-gray-400 text-sm border border-dashed border-[#66BB6A33]">Kamera o'chirilgan</div>
                                 <div id="camera-result" class="mt-2 text-sm text-[#43A047]"></div>
                             </div>
                             <div class="mb-4">
-                                <button class="btn-cyber btn-sm" onclick="startVoice()">🎤 Ovoz bilan gapirish</button>
-                                <button class="btn-red btn-sm" onclick="stopVoice()">⏹ To'xtatish</button>
+                                <button class="btn btn-primary btn-sm" onclick="startVoice()">🎤 Ovoz bilan gapirish</button>
+                                <button class="btn btn-red btn-sm" onclick="stopVoice()">⏹ To'xtatish</button>
                                 <span id="voice-status" class="text-sm text-gray-500"></span>
                                 <div id="voice-transcript" class="mt-2 p-3 bg-gray-50 rounded-xl text-sm text-gray-700 min-h-[48px] border border-[#66BB6A33]">Ovoz matni...</div>
                             </div>
@@ -681,7 +864,7 @@
                                 </div>
                                 <div class="flex gap-2 mt-3">
                                     <input id="consult-input" type="text" placeholder="Xabar yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" />
-                                    <button class="btn-cyber btn-sm" onclick="sendConsult()">Yuborish</button>
+                                    <button class="btn btn-primary btn-sm" onclick="sendConsult()">Yuborish</button>
                                 </div>
                             </div>
                         </div>
@@ -694,13 +877,13 @@
                         <div id="social-lock" class="lock-overlay" style="display:none;">
                             <div class="lock-icon">🔒</div>
                             <p>Ijtimoiy tarmoqdan foydalanish uchun tizimga kiring</p>
-                            <button class="btn-cyber btn-sm" onclick="openAuthModal('signin')">Kirish</button>
+                            <button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button>
                         </div>
                         <div id="social-content">
                             <h2 class="text-xl font-bold text-[#43A047] mb-3">📡 Ijtimoiy tarmoq</h2>
                             <div class="flex gap-2 mb-4">
                                 <input id="social-input" type="text" placeholder="Holatingiz haqida yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" />
-                                <button class="btn-cyber btn-sm" onclick="createSocialPost()">Yozish</button>
+                                <button class="btn btn-primary btn-sm" onclick="createSocialPost()">Yozish</button>
                             </div>
                             <div id="social-feed" class="max-h-[520px] overflow-y-auto"></div>
                         </div>
@@ -713,7 +896,7 @@
                         <div id="profile-lock" class="lock-overlay" style="display:none;">
                             <div class="lock-icon">🔒</div>
                             <p>Profilni ko'rish uchun tizimga kiring</p>
-                            <button class="btn-cyber btn-sm" onclick="openAuthModal('signin')">Kirish</button>
+                            <button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button>
                         </div>
                         <div id="profile-content">
                             <h2 class="text-xl font-bold text-[#43A047] mb-3">👤 Profil</h2>
@@ -728,7 +911,7 @@
                         <div id="packages-lock" class="lock-overlay" style="display:none;">
                             <div class="lock-icon">🔒</div>
                             <p>Paketlarni ko'rish uchun tizimga kiring</p>
-                            <button class="btn-cyber btn-sm" onclick="openAuthModal('signin')">Kirish</button>
+                            <button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button>
                         </div>
                         <div id="packages-content">
                             <h2 class="text-xl font-bold text-[#FFB300] mb-3">📦 Paketlar</h2>
@@ -743,7 +926,7 @@
                         <div id="stats-lock" class="lock-overlay" style="display:none;">
                             <div class="lock-icon">🔒</div>
                             <p>Statistikani ko'rish uchun tizimga kiring</p>
-                            <button class="btn-cyber btn-sm" onclick="openAuthModal('signin')">Kirish</button>
+                            <button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button>
                         </div>
                         <div id="stats-content-full">
                             <h2 class="text-xl font-bold text-[#43A047] mb-3">📊 Statistika</h2>
@@ -759,12 +942,12 @@
                         <div id="ads-lock" class="lock-overlay" style="display:none;">
                             <div class="lock-icon">🔒</div>
                             <p>AI ADS ni ko'rish uchun tizimga kiring</p>
-                            <button class="btn-cyber btn-sm" onclick="openAuthModal('signin')">Kirish</button>
+                            <button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button>
                         </div>
                         <div id="ads-content">
                             <h2 class="text-xl font-bold text-[#43A047] mb-3">📈 AI ADS</h2>
                             <div id="ads-performance" class="space-y-2 max-h-[500px] overflow-y-auto"></div>
-                            <button class="btn-cyber btn-sm mt-3" onclick="loadAdsPerformance()">🔄 Yangilash</button>
+                            <button class="btn btn-primary btn-sm mt-3" onclick="loadAdsPerformance()">🔄 Yangilash</button>
                         </div>
                     </div>
                 </div>
@@ -775,14 +958,14 @@
                         <div id="admin-lock" class="lock-overlay" style="display:none;">
                             <div class="lock-icon">🔒</div>
                             <p>Admin paneliga kirish uchun tizimga kiring</p>
-                            <button class="btn-cyber btn-sm" onclick="openAuthModal('signin')">Kirish</button>
+                            <button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button>
                         </div>
                         <div id="admin-content-full">
                             <h2 class="text-xl font-bold text-[#FFB300] mb-3">⚙️ Admin</h2>
                             <div class="flex gap-2 mb-4">
                                 <input id="admin-user" type="text" placeholder="Admin" value="CEO" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" />
                                 <input id="admin-pass" type="password" placeholder="Parol" value="12345678" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" />
-                                <button class="btn-cyber btn-sm" onclick="adminLogin()">🔐 Kirish</button>
+                                <button class="btn btn-primary btn-sm" onclick="adminLogin()">🔐 Kirish</button>
                             </div>
                             <div id="admin-content" class="hidden">
                                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" id="admin-stats-grid"></div>
@@ -796,13 +979,13 @@
         </div>
     </div>
 
-    <!-- ============================================================ -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <!-- JAVASCRIPT -->
-    <!-- ============================================================ -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <script>
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // GLOBAL STATE
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         let currentUser = null;
         let authMode = 'signup';
         let tokenBalance = 100;
@@ -813,9 +996,9 @@
         let voiceActive = false;
         let isAuthenticated = false;
 
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // AUTH MODAL
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         function openAuthModal(mode) {
             if (mode) switchAuth(mode);
             document.getElementById('auth-modal').classList.add('show');
@@ -829,7 +1012,8 @@
 
         function switchAuth(mode) {
             authMode = mode;
-            document.getElementById('auth-modal-title').innerText = mode === 'signup' ? '🔐 RO\'YXATDAN O\'TISH' : '🔐 KIRISH';
+            document.getElementById('auth-modal-title').innerText = mode === 'signup' ? '🔐 RO\'YXATDAN O\'TISH' :
+                '🔐 KIRISH';
             document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
             document.getElementById('tab-' + mode).classList.add('active');
             document.getElementById('email-group').style.display = mode === 'signup' ? 'block' : 'none';
@@ -925,8 +1109,12 @@
             // Show lock overlays
             document.querySelectorAll('.lock-overlay').forEach(el => el.style.display = 'flex');
 
-            if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); }
-            if (recognition) { recognition.stop(); }
+            if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop());
+                cameraStream = null; }
+            if (recognition) { recognition.stop();
+                recognition = null; }
+            cameraActive = false;
+            voiceActive = false;
 
             // Reset chat
             document.getElementById('consult-chat').innerHTML = `
@@ -936,9 +1124,9 @@
             openAuthModal('signin');
         }
 
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // PANEL SWITCH
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         function switchPanel(panelId, btn) {
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             document.getElementById(panelId).classList.add('active');
@@ -960,15 +1148,16 @@
             if (isAuthenticated) {
                 if (panelId === 'panel-profile') loadProfile();
                 if (panelId === 'panel-social') loadSocialFeed();
-                if (panelId === 'panel-stats') { loadStats(); loadHealthRanking(); }
+                if (panelId === 'panel-stats') { loadStats();
+                    loadHealthRanking(); }
                 if (panelId === 'panel-ads') loadAdsPerformance();
                 if (panelId === 'panel-packages') renderPackages();
             }
         }
 
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // PROFILE
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         async function loadProfile() {
             if (!currentUser) return;
             try {
@@ -1011,9 +1200,9 @@
             } catch (e) { console.error(e); }
         }
 
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // SOCIAL FEED
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         async function loadSocialFeed() {
             if (!currentUser) return;
             try {
@@ -1081,9 +1270,9 @@
             } catch (e) { alert(e.message); }
         }
 
-        // ============================================================
-        // CONSULTATION (AI Chat + Camera + Voice)
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // CONSULTATION
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         async function sendConsult() {
             if (!currentUser) { openAuthModal('signin'); return; }
             const input = document.getElementById('consult-input');
@@ -1120,7 +1309,7 @@
             }
         });
 
-        // Camera
+        // ─── Camera ───
         async function startCamera() {
             if (!currentUser) { openAuthModal('signin'); return; }
             try {
@@ -1135,7 +1324,8 @@
         }
 
         function stopCamera() {
-            if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+            if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop());
+                cameraStream = null; }
             document.getElementById('camera-preview').style.display = 'none';
             document.getElementById('camera-placeholder').style.display = 'block';
             cameraActive = false;
@@ -1163,12 +1353,12 @@
                     body: JSON.stringify({ username: currentUser, department_id: 1, image_data: base64 })
                 });
                 const data = await res.json();
-                if (data.success) { result.innerText = '🔬 ' + data.analysis; loadProfile(); }
-                else { result.innerText = '❌ ' + data.message; }
+                if (data.success) { result.innerText = '🔬 ' + data.analysis;
+                    loadProfile(); } else { result.innerText = '❌ ' + data.message; }
             } catch (e) { result.innerText = '❌ ' + e.message; }
         }
 
-        // Voice
+        // ─── Voice ───
         function startVoice() {
             if (!currentUser) { openAuthModal('signin'); return; }
             if (!('webkitSpeechRecognition' in window)) { alert('Brauzer ovozni qo‘llab-quvvatlamaydi'); return; }
@@ -1193,19 +1383,21 @@
                     sendConsult();
                 }
             };
-            recognition.onerror = (e) => { console.error(e); stopVoice(); };
+            recognition.onerror = (e) => { console.error(e);
+                stopVoice(); };
             recognition.start();
         }
 
         function stopVoice() {
-            if (recognition) { recognition.stop(); recognition = null; }
+            if (recognition) { recognition.stop();
+                recognition = null; }
             voiceActive = false;
             document.getElementById('voice-status').innerHTML = '';
         }
 
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // HEALTH RANKING
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         async function loadHealthRanking() {
             try {
                 const res = await fetch('/api/v2/health/ranking');
@@ -1226,9 +1418,9 @@
             } catch (e) {}
         }
 
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // STATS
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         async function loadStats() {
             try {
                 const res = await fetch('/api/v2/system/stats');
@@ -1243,9 +1435,9 @@
             } catch (e) {}
         }
 
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // ADS
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         async function loadAdsPerformance() {
             try {
                 const res = await fetch('/api/v2/ai/ads-performance');
@@ -1255,9 +1447,9 @@
             } catch (e) {}
         }
 
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // PACKAGES
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         function renderPackages() {
             const container = document.getElementById('package-grid');
             container.innerHTML = `
@@ -1268,9 +1460,9 @@
             `;
         }
 
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // NOTIFICATIONS
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         async function loadNotifications() {
             if (!currentUser) return;
             try {
@@ -1301,9 +1493,9 @@
             }
         }
 
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // ADMIN
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         async function adminLogin() {
             const user = document.getElementById('admin-user').value.trim();
             const pass = document.getElementById('admin-pass').value.trim();
@@ -1335,18 +1527,12 @@
             } catch (e) {}
         }
 
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // INIT
-        // ============================================================
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         window.onload = function() {
-            // Show auth modal by default if not logged in
-            // Check if user is already logged in via session? For simplicity, show auth.
-            // We'll check if there's a currentUser from localStorage? Not implemented.
-            // For now, show login modal and main app hidden.
             document.getElementById('main-app').style.display = 'none';
-            // Show lock overlays on all panels
             document.querySelectorAll('.lock-overlay').forEach(el => el.style.display = 'flex');
-            // Open auth modal
             openAuthModal('signin');
         };
 
