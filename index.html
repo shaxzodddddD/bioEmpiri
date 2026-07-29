@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="uz">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🧬 BioEmpire V13</title>
-    <script src="https://cdn.tailwindcss.com">
-    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* ─── ROOT ─── */
         :root {
@@ -50,6 +49,7 @@
 
         /* ─── BUTTONS ─── */
         .btn {
+            display: inline-block;
             padding: 8px 20px;
             border: none;
             border-radius: 12px;
@@ -745,7 +745,7 @@
                     <option value="SOL">SOL</option>
                 </select>
             </div>
-            <button class="btn btn-primary w-full" onclick="executeAuth()">🚀 TIZIMNI FAOLASHTIRISH</button>
+            <button class="btn btn-primary" style="width:100%;" onclick="executeAuth()">🚀 TIZIMNI FAOLASHTIRISH</button>
             <p id="auth-error" class="auth-error"></p>
             <div class="text-center mt-3 text-xs text-gray-500">Admin: CEO / parol: 12345678</div>
         </div>
@@ -931,7 +931,10 @@
                         <div id="stats-content-full">
                             <h2 class="text-xl font-bold text-[#43A047] mb-3">📊 Statistika</h2>
                             <div id="stats-content" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-                            <div class="mt-4"><h3 class="text-sm font-bold text-[#43A047]">🏅 Salomatlik reytingi</h3><div id="health-ranking" class="max-h-[200px] overflow-y-auto"></div></div>
+                            <div class="mt-4">
+                                <h3 class="text-sm font-bold text-[#43A047]">🏅 Salomatlik reytingi</h3>
+                                <div id="health-ranking" class="max-h-[200px] overflow-y-auto"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1054,31 +1057,24 @@
                     return;
                 }
 
-                // Success
                 isAuthenticated = true;
                 currentUser = data.username;
                 closeAuthModal();
 
-                // Show main app
                 document.getElementById('main-app').style.display = 'block';
-
-                // Update header
                 document.getElementById('auth-buttons').style.display = 'none';
                 document.getElementById('user-info').style.display = 'flex';
                 document.getElementById('header-username').innerText = currentUser;
                 document.getElementById('header-balance').innerText = '$' + data.balance.toFixed(2);
                 document.getElementById('header-avatar').innerText = data.avatar || '🧬';
 
-                // Update sidebar
                 document.getElementById('sidebar-username').innerText = currentUser;
                 document.getElementById('sidebar-balance').innerText = data.balance.toFixed(2);
                 document.getElementById('sidebar-status').innerText = data.status || 'WARNING';
                 document.getElementById('sidebar-avatar').innerText = data.avatar || '🧬';
 
-                // Hide all lock overlays
                 document.querySelectorAll('.lock-overlay').forEach(el => el.style.display = 'none');
 
-                // Load data
                 loadProfile();
                 loadSocialFeed();
                 loadHealthRanking();
@@ -1087,7 +1083,6 @@
                 renderPackages();
                 loadNotifications();
 
-                // Periodic updates
                 setInterval(loadSocialFeed, 8000);
                 setInterval(loadHealthRanking, 15000);
                 setInterval(loadNotifications, 10000);
@@ -1106,7 +1101,6 @@
             document.getElementById('user-info').style.display = 'none';
             document.getElementById('main-app').style.display = 'none';
 
-            // Show lock overlays
             document.querySelectorAll('.lock-overlay').forEach(el => el.style.display = 'flex');
 
             if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop());
@@ -1116,7 +1110,6 @@
             cameraActive = false;
             voiceActive = false;
 
-            // Reset chat
             document.getElementById('consult-chat').innerHTML = `
                 <div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing yoki gapiring.</div>
             `;
@@ -1133,7 +1126,6 @@
             document.querySelectorAll('.sidebar-btn[data-panel]').forEach(b => b.classList.remove('active'));
             if (btn) btn.classList.add('active');
 
-            // If not authenticated, show lock overlay
             if (!isAuthenticated) {
                 const panel = document.getElementById(panelId);
                 const lock = panel.querySelector('.lock-overlay');
@@ -1144,7 +1136,6 @@
                 if (lock) lock.style.display = 'none';
             }
 
-            // Load data if authenticated
             if (isAuthenticated) {
                 if (panelId === 'panel-profile') loadProfile();
                 if (panelId === 'panel-social') loadSocialFeed();
@@ -1190,7 +1181,6 @@
                     </div>
                 `;
 
-                // Update header and sidebar
                 document.getElementById('header-balance').innerText = '$' + data.balance.toFixed(2);
                 document.getElementById('sidebar-balance').innerText = data.balance.toFixed(2);
                 document.getElementById('sidebar-status').innerText = data.status;
@@ -1408,7 +1398,7 @@
                     const div = document.createElement('div');
                     div.className = 'ranking-item';
                     div.innerHTML = `
-                        <span class="pos">${idx+1}</span>
+                        <span class="pos">${idx + 1}</span>
                         <span>${item.avatar || '🧬'}</span>
                         <span class="name">${item.username}</span>
                         <span class="score">${item.health_score}%</span>
