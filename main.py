@@ -20,7 +20,7 @@ try:
 except ImportError:
     GEMINI_AVAILABLE = False
 
-# ---------- KALITLAR (muhit o‘zgaruvchilaridan) ----------
+# ---------- API KEYS (from environment) ----------
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-1.5-flash"
@@ -28,9 +28,9 @@ GROQ_MODEL = "mixtral-8x7b-32768"
 
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    print("✅ Gemini sozlandi")
+    print("✅ Gemini configured")
 else:
-    print("⚠️ Gemini sozlanmadi – GEMINI_API_KEY ni qo'shing")
+    print("⚠️ Gemini not configured – add GEMINI_API_KEY")
 
 app = FastAPI(title="BioEmpire V13", version="13.0.0")
 app.add_middleware(
@@ -41,7 +41,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------- BAZA (database_log.json) ----------
+# ---------- DATABASE ----------
 DB_FILE = "database_log.json"
 db_lock = asyncio.Lock()
 
@@ -72,7 +72,7 @@ def save_db(data):
             json.dump(data, f, indent=4, ensure_ascii=False)
         return True
     except Exception as e:
-        print(f"[DB] xato: {e}")
+        print(f"[DB] error: {e}")
         return False
 
 db = load_db()
@@ -114,7 +114,7 @@ def track_user_activity(username: str, action: str, details: dict = None):
         db["user_activity"][username]["actions"] = db["user_activity"][username]["actions"][-100:]
     save_db(db)
 
-# ---------- AI CHAQIRUVLARI ----------
+# ---------- AI CALLS ----------
 async def call_groq_api(messages: List[dict]) -> Optional[str]:
     if not GROQ_API_KEY:
         return None
@@ -154,7 +154,7 @@ async def call_ai_api(messages: List[dict]) -> Optional[str]:
         return response
     return await call_groq_api(messages)
 
-# ---------- PYDANTIC MODELLAR ----------
+# ---------- PYDANTIC MODELS ----------
 class UserRegister(BaseModel):
     username: str = Field(..., min_length=2, max_length=30)
     email: str
@@ -212,7 +212,7 @@ def get_html_content():
         """
 
 # ============================================================
-# ENDPOINTLAR
+# ENDPOINTS
 # ============================================================
 @app.get("/", response_class=HTMLResponse)
 @app.head("/", response_class=HTMLResponse)
@@ -393,6 +393,15 @@ async def camera_analyze(req: CameraAnalysisRequest):
                     analysis_result = "🔬 " + response.text
             except Exception as e:
                 analysis_result = f"🔬 Xatolik: {e}"
+        else:
+            # Fallback to text AI
+            messages = [
+                {"role": "system", "content": "Siz BioEmpire AI analistisisiz."},
+                {"role": "user", "content": "Rasmda teri toshmasi ko'rinadi. Diagnostika bering."}
+            ]
+            ai_resp = await call_ai_api(messages)
+            if ai_resp:
+                analysis_result = "🔬 " + ai_resp
         return {"success": True, "analysis": analysis_result, "new_balance": user["balance"], "deducted": price}
 
 @app.get("/api/v2/health/ranking")
@@ -464,8 +473,9 @@ async def admin_dashboard(username: str = None, password: str = None):
     }
 
 # ============================================================
-# SERVER
+# SERVER START
 # ============================================================
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5050))
+    print(f"🧬 BioEmpire V13 running on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
