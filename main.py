@@ -246,6 +246,7 @@ HTML = """<!DOCTYPE html>
         .sidebar-btn.active { background:rgba(102,187,106,0.1); border-color:var(--accent); color:var(--accent-dark); font-weight:600; }
         .sidebar-btn .icon { font-size:20px; width:28px; text-align:center; }
         .sidebar-btn .badge { margin-left:auto; background:var(--red); color:#fff; font-size:10px; padding:0 8px; border-radius:30px; font-weight:700; }
+        .sidebar-divider { border-top:1px solid var(--border); margin:10px 0 12px; }
         .panel { display:none; animation:fadeSlide 0.3s ease; }
         .panel.active { display:block; }
         @keyframes fadeSlide { 0%{opacity:0;transform:translateY(10px);} 100%{opacity:1;transform:translateY(0);} }
