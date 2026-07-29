@@ -14,9 +14,9 @@
             --red: #E53935;
             --text: #1B3A1B;
             --muted: #4A6A4A;
-            --glass: rgba(255, 255, 255, 0.85);
-            --border: rgba(102, 187, 106, 0.3);
-            --shadow: 0 8px 32px rgba(0, 40, 0, 0.08);
+            --glass: rgba(255,255,255,0.85);
+            --border: rgba(102,187,106,0.3);
+            --shadow: 0 8px 32px rgba(0,40,0,0.08);
         }
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',system-ui,sans-serif; }
         body { background:var(--bg); color:var(--text); min-height:100vh; }
@@ -34,7 +34,6 @@
         .btn-outline:hover { background:rgba(102,187,106,0.08); }
         .btn-sm { padding:6px 16px; font-size:12px; border-radius:10px; }
         .btn-xs { padding:4px 12px; font-size:11px; border-radius:8px; }
-
         header { background:rgba(255,255,255,0.95); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); padding:10px 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:1000; flex-wrap:wrap; gap:10px; }
         .logo { font-size:24px; font-weight:900; color:var(--accent-dark); display:flex; align-items:center; gap:8px; cursor:pointer; }
         .logo span { font-size:28px; }
@@ -44,7 +43,6 @@
         .user-avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent-dark)); display:flex; align-items:center; justify-content:center; font-size:18px; border:2px solid var(--gold); flex-shrink:0; }
         .user-name { font-weight:600; font-size:14px; color:var(--text); }
         .user-balance { font-size:13px; color:var(--accent-dark); font-weight:700; }
-
         #auth-modal { position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(8px); display:none; align-items:center; justify-content:center; z-index:99999; }
         #auth-modal.show { display:flex; }
         .auth-card { background:#fff; border-radius:28px; padding:36px 32px; width:100%; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,0.2); animation:modalIn 0.3s ease; max-height:90vh; overflow-y:auto; }
@@ -61,7 +59,6 @@
         .input-group input, .input-group select { width:100%; background:#f5faf5; border:1.5px solid var(--border); padding:10px 14px; color:var(--text); border-radius:12px; outline:none; font-size:14px; }
         .input-group input:focus, .input-group select:focus { border-color:var(--accent); box-shadow:0 0 0 4px rgba(102,187,106,0.1); }
         .auth-error { color:var(--red); font-size:12px; margin-top:8px; text-align:center; }
-
         .sidebar { width:240px; flex-shrink:0; background:rgba(255,255,255,0.92); backdrop-filter:blur(12px); border-right:1px solid var(--border); height:calc(100vh - 72px); overflow-y:auto; padding:16px 12px; position:sticky; top:72px; }
         .sidebar-btn { display:flex; align-items:center; gap:12px; width:100%; padding:10px 14px; background:transparent; border:1px solid transparent; border-radius:14px; color:var(--muted); cursor:pointer; transition:0.2s; font-size:14px; font-weight:500; margin-bottom:2px; }
         .sidebar-btn:hover { background:rgba(102,187,106,0.06); border-color:var(--border); color:var(--text); }
@@ -69,7 +66,6 @@
         .sidebar-btn .icon { font-size:20px; width:28px; text-align:center; }
         .sidebar-btn .badge { margin-left:auto; background:var(--red); color:#fff; font-size:10px; padding:0 8px; border-radius:30px; font-weight:700; }
         .sidebar-divider { border-top:1px solid var(--border); margin:10px 0 12px; }
-
         .panel { display:none; animation:fadeSlide 0.3s ease; }
         .panel.active { display:block; }
         @keyframes fadeSlide { 0%{opacity:0;transform:translateY(10px);} 100%{opacity:1;transform:translateY(0);} }
@@ -77,41 +73,34 @@
         .lock-overlay .lock-icon { font-size:48px; }
         .lock-overlay p { color:var(--muted); font-weight:600; }
         .panel-wrapper { position:relative; min-height:200px; }
-
         .chat-terminal { height:200px; background:#f9fbf9; border:1px solid var(--border); border-radius:14px; padding:12px 16px; overflow-y:auto; font-size:14px; }
         .chat-msg { margin-bottom:8px; padding:6px 14px; border-radius:12px; max-width:90%; }
         .chat-msg.ai { background:rgba(102,187,106,0.08); border-left:3px solid var(--accent); }
         .chat-msg.user { background:rgba(255,179,0,0.08); border-right:3px solid var(--gold); text-align:right; margin-left:auto; }
         .chat-msg.warning { background:rgba(229,57,53,0.08); border-left:3px solid var(--red); color:#B71C1C; }
-
         .feed-item { background:rgba(255,255,255,0.6); border:1px solid var(--border); padding:12px 16px; border-radius:14px; margin-bottom:10px; border-left:4px solid var(--accent); }
         .feed-item .user { color:var(--accent-dark); font-weight:700; }
         .feed-item .time { color:var(--muted); font-size:11px; float:right; }
         .feed-item .actions { margin-top:8px; display:flex; gap:16px; font-size:13px; color:var(--muted); cursor:pointer; }
         .feed-item .actions span:hover { color:var(--accent-dark); }
-
         .package-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:12px; margin-top:14px; }
         .package-card { background:#fff; border:1px solid rgba(255,179,0,0.15); border-radius:14px; padding:14px 8px; text-align:center; cursor:pointer; transition:0.25s; }
         .package-card:hover { border-color:var(--gold); transform:translateY(-4px); box-shadow:0 8px 24px rgba(255,179,0,0.08); }
         .package-card .pkg-name { font-size:12px; font-weight:700; }
         .package-card .pkg-price { color:var(--gold); font-size:15px; font-weight:800; }
-
         .ranking-item { display:flex; align-items:center; gap:12px; padding:6px 12px; border-bottom:1px solid var(--border); font-size:14px; }
         .ranking-item .pos { color:var(--gold); font-weight:700; width:30px; }
         .ranking-item .name { flex:1; }
         .ranking-item .score { color:var(--accent-dark); font-weight:700; }
-
         #camera-preview { width:100%; max-height:240px; border-radius:16px; background:#000; object-fit:cover; border:2px solid var(--border); }
         .voice-indicator { display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--accent); margin-right:6px; animation:pulse-dot 1s infinite; }
         @keyframes pulse-dot { 0%,100%{opacity:0.4;transform:scale(0.9);} 50%{opacity:1;transform:scale(1.2);} }
-
         .status-badge { display:inline-block; padding:2px 12px; border-radius:20px; font-size:11px; font-weight:700; }
         .status-warning { background:#FFB300; color:#1B3A1B; }
         .status-red { background:var(--red); color:#fff; }
         .status-optimized { background:var(--accent); color:#fff; }
         .status-immortal { background:var(--gold); color:#1B3A1B; }
         .avatar-lg { width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,#C8E6C9,var(--accent)); display:flex; align-items:center; justify-content:center; font-size:28px; border:2px solid var(--gold); flex-shrink:0; }
-
         .notif-bell { position:relative; cursor:pointer; font-size:22px; }
         .notif-badge { position:absolute; top:-6px; right:-8px; background:var(--red); color:#fff; border-radius:50%; padding:0 6px; font-size:10px; font-weight:800; min-width:18px; text-align:center; animation:pulse-badge 1.8s infinite; }
         @keyframes pulse-badge { 0%,100%{transform:scale(1);} 50%{transform:scale(1.15);} }
@@ -120,15 +109,12 @@
         .notif-item { padding:8px 10px; border-bottom:1px solid var(--border); font-size:13px; }
         .notif-item .time { color:var(--muted); font-size:11px; float:right; }
         .notif-item.unread { border-left:3px solid var(--accent); }
-
         .admin-stat { background:#fff; border:1px solid var(--border); border-radius:16px; padding:16px; text-align:center; }
         .admin-stat .value { font-size:28px; font-weight:900; color:var(--accent-dark); }
         .admin-stat .label { font-size:12px; color:var(--muted); font-weight:600; }
-
         ::-webkit-scrollbar { width:5px; }
         ::-webkit-scrollbar-track { background:var(--bg); }
         ::-webkit-scrollbar-thumb { background:var(--accent); border-radius:20px; }
-
         @media (max-width:1024px) { .sidebar { width:70px !important; padding:10px 6px; } .sidebar .btn-text { display:none; } .sidebar .icon { font-size:24px; width:100%; text-align:center; } .sidebar .badge { display:none; } }
         @media (max-width:768px) { .sidebar { display:none; } header { padding:8px 16px; flex-direction:column; align-items:stretch; gap:6px; } .logo { font-size:20px; justify-content:center; } .auth-section { justify-content:center; flex-wrap:wrap; } .auth-section .auth-buttons .btn-text { display:none; } .auth-card { margin:16px; padding:24px 20px; } }
     </style>
@@ -253,6 +239,9 @@
     </div>
 
     <script>
+        // =========================================
+        // GLOBAL STATE
+        // =========================================
         let currentUser = null;
         let authMode = 'signup';
         let tokenBalance = 100;
@@ -263,188 +252,544 @@
         let voiceActive = false;
         let isAuthenticated = false;
 
-        function openAuthModal(mode){if(mode)switchAuth(mode);document.getElementById('auth-modal').classList.add('show');document.body.style.overflow='hidden';}
-        function closeAuthModal(){document.getElementById('auth-modal').classList.remove('show');document.body.style.overflow='';}
-        function switchAuth(mode){authMode=mode;document.getElementById('auth-modal-title').innerText=mode==='signup'?'🔐 RO\'YXATDAN O\'TISH':'🔐 KIRISH';document.querySelectorAll('.auth-tab').forEach(el=>el.classList.remove('active'));document.getElementById('tab-'+mode).classList.add('active');document.getElementById('email-group').style.display=mode==='signup'?'block':'none';document.getElementById('currency-group').style.display=mode==='signup'?'block':'none';document.getElementById('auth-error').innerText='';}
-
-        async function executeAuth(){
-            const user=document.getElementById('auth-user').value.trim();
-            const pass=document.getElementById('auth-pass').value;
-            const email=document.getElementById('auth-email').value.trim();
-            const curr=document.getElementById('auth-curr').value;
-            const errEl=document.getElementById('auth-error');
-            errEl.innerText='';
-            if(!user){errEl.innerText="Username kiritilmagan!";return;}
-            if(!pass||pass.length<6){errEl.innerText="Parol kamida 6 belgi!";return;}
-            if(authMode==='signup'&&!email){errEl.innerText="Email kiritilmagan!";return;}
-            const url=authMode==='signup'?'/api/v2/auth/signup':'/api/v2/auth/signin';
-            const body=authMode==='signup'?{username:user,password:pass,email:email,currency:curr}:{username:user,password:pass};
-            try{
-                const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-                const data=await res.json();
-                if(!res.ok){errEl.innerText=data.detail||"Server xatosi.";return;}
-                if(data.status!=='success'){errEl.innerText=data.message||"Noma'lum xatolik.";return;}
-                isAuthenticated=true;currentUser=data.username;closeAuthModal();
-                document.getElementById('main-app').style.display='block';
-                document.getElementById('auth-buttons').style.display='none';
-                document.getElementById('user-info').style.display='flex';
-                document.getElementById('header-username').innerText=currentUser;
-                document.getElementById('header-balance').innerText='$'+data.balance.toFixed(2);
-                document.getElementById('header-avatar').innerText=data.avatar||'🧬';
-                document.getElementById('sidebar-username').innerText=currentUser;
-                document.getElementById('sidebar-balance').innerText=data.balance.toFixed(2);
-                document.getElementById('sidebar-status').innerText=data.status||'WARNING';
-                document.getElementById('sidebar-avatar').innerText=data.avatar||'🧬';
-                document.querySelectorAll('.lock-overlay').forEach(el=>el.style.display='none');
-                loadProfile();loadSocialFeed();loadHealthRanking();loadStats();loadAdsPerformance();renderPackages();loadNotifications();
-                setInterval(loadSocialFeed,8000);setInterval(loadHealthRanking,15000);setInterval(loadNotifications,10000);setInterval(loadAdsPerformance,30000);
-            }catch(e){errEl.innerText="Tarmoq xatosi: "+e.message;console.error(e);}
+        // =========================================
+        // AUTH MODAL
+        // =========================================
+        function openAuthModal(mode) {
+            if (mode) switchAuth(mode);
+            document.getElementById('auth-modal').classList.add('show');
+            document.body.style.overflow = 'hidden';
         }
 
-        function logout(){
-            isAuthenticated=false;currentUser=null;
-            document.getElementById('auth-buttons').style.display='flex';
-            document.getElementById('user-info').style.display='none';
-            document.getElementById('main-app').style.display='none';
-            document.querySelectorAll('.lock-overlay').forEach(el=>el.style.display='flex');
-            if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null;}
-            if(recognition){recognition.stop();recognition=null;}
-            cameraActive=false;voiceActive=false;
-            document.getElementById('consult-chat').innerHTML='<div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing yoki gapiring.</div>';
+        function closeAuthModal() {
+            document.getElementById('auth-modal').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        function switchAuth(mode) {
+            authMode = mode;
+            document.getElementById('auth-modal-title').innerText = mode === 'signup' ? '🔐 RO\'YXATDAN O\'TISH' :
+                '🔐 KIRISH';
+            document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + mode).classList.add('active');
+            document.getElementById('email-group').style.display = mode === 'signup' ? 'block' : 'none';
+            document.getElementById('currency-group').style.display = mode === 'signup' ? 'block' : 'none';
+            document.getElementById('auth-error').innerText = '';
+        }
+
+        async function executeAuth() {
+            const user = document.getElementById('auth-user').value.trim();
+            const pass = document.getElementById('auth-pass').value;
+            const email = document.getElementById('auth-email').value.trim();
+            const curr = document.getElementById('auth-curr').value;
+            const errEl = document.getElementById('auth-error');
+            errEl.innerText = '';
+
+            if (!user) { errEl.innerText = "Username kiritilmagan!"; return; }
+            if (!pass || pass.length < 6) { errEl.innerText = "Parol kamida 6 belgi!"; return; }
+            if (authMode === 'signup' && !email) { errEl.innerText = "Email kiritilmagan!"; return; }
+
+            const url = authMode === 'signup' ? '/api/v2/auth/signup' : '/api/v2/auth/signin';
+            const body = authMode === 'signup' ?
+                { username: user, password: pass, email: email, currency: curr } :
+                { username: user, password: pass };
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    errEl.innerText = data.detail || "Server xatosi.";
+                    return;
+                }
+                if (data.status !== 'success') {
+                    errEl.innerText = data.message || "Noma'lum xatolik.";
+                    return;
+                }
+
+                isAuthenticated = true;
+                currentUser = data.username;
+                closeAuthModal();
+
+                document.getElementById('main-app').style.display = 'block';
+                document.getElementById('auth-buttons').style.display = 'none';
+                document.getElementById('user-info').style.display = 'flex';
+                document.getElementById('header-username').innerText = currentUser;
+                document.getElementById('header-balance').innerText = '$' + data.balance.toFixed(2);
+                document.getElementById('header-avatar').innerText = data.avatar || '🧬';
+
+                document.getElementById('sidebar-username').innerText = currentUser;
+                document.getElementById('sidebar-balance').innerText = data.balance.toFixed(2);
+                document.getElementById('sidebar-status').innerText = data.status || 'WARNING';
+                document.getElementById('sidebar-avatar').innerText = data.avatar || '🧬';
+
+                document.querySelectorAll('.lock-overlay').forEach(el => el.style.display = 'none');
+
+                loadProfile();
+                loadSocialFeed();
+                loadHealthRanking();
+                loadStats();
+                loadAdsPerformance();
+                renderPackages();
+                loadNotifications();
+
+                setInterval(loadSocialFeed, 8000);
+                setInterval(loadHealthRanking, 15000);
+                setInterval(loadNotifications, 10000);
+                setInterval(loadAdsPerformance, 30000);
+
+            } catch (e) {
+                errEl.innerText = "Tarmoq xatosi: " + e.message;
+                console.error(e);
+            }
+        }
+
+        function logout() {
+            isAuthenticated = false;
+            currentUser = null;
+            document.getElementById('auth-buttons').style.display = 'flex';
+            document.getElementById('user-info').style.display = 'none';
+            document.getElementById('main-app').style.display = 'none';
+
+            document.querySelectorAll('.lock-overlay').forEach(el => el.style.display = 'flex');
+
+            if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop());
+                cameraStream = null; }
+            if (recognition) { recognition.stop();
+                recognition = null; }
+            cameraActive = false;
+            voiceActive = false;
+
+            document.getElementById('consult-chat').innerHTML = `
+                <div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing yoki gapiring.</div>
+            `;
+
             openAuthModal('signin');
         }
 
-        function switchPanel(panelId,btn){
-            document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+        // =========================================
+        // PANEL SWITCH
+        // =========================================
+        function switchPanel(panelId, btn) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             document.getElementById(panelId).classList.add('active');
-            document.querySelectorAll('.sidebar-btn[data-panel]').forEach(b=>b.classList.remove('active'));
-            if(btn)btn.classList.add('active');
-            if(!isAuthenticated){
-                const panel=document.getElementById(panelId);
-                const lock=panel.querySelector('.lock-overlay');
-                if(lock)lock.style.display='flex';
-            }else{
-                const panel=document.getElementById(panelId);
-                const lock=panel.querySelector('.lock-overlay');
-                if(lock)lock.style.display='none';
+            document.querySelectorAll('.sidebar-btn[data-panel]').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+
+            if (!isAuthenticated) {
+                const panel = document.getElementById(panelId);
+                const lock = panel.querySelector('.lock-overlay');
+                if (lock) lock.style.display = 'flex';
+            } else {
+                const panel = document.getElementById(panelId);
+                const lock = panel.querySelector('.lock-overlay');
+                if (lock) lock.style.display = 'none';
             }
-            if(isAuthenticated){
-                if(panelId==='panel-profile')loadProfile();
-                if(panelId==='panel-social')loadSocialFeed();
-                if(panelId==='panel-stats'){loadStats();loadHealthRanking();}
-                if(panelId==='panel-ads')loadAdsPerformance();
-                if(panelId==='panel-packages')renderPackages();
+
+            if (isAuthenticated) {
+                if (panelId === 'panel-profile') loadProfile();
+                if (panelId === 'panel-social') loadSocialFeed();
+                if (panelId === 'panel-stats') { loadStats();
+                    loadHealthRanking(); }
+                if (panelId === 'panel-ads') loadAdsPerformance();
+                if (panelId === 'panel-packages') renderPackages();
             }
         }
 
-        async function loadProfile(){
-            if(!currentUser)return;
-            try{
-                const res=await fetch(`/api/v2/profile/${currentUser}`);
-                const data=await res.json();
-                const container=document.getElementById('profile-data');
-                const statusClass=data.status==='WARNING'?'status-warning':data.status==='RED_ZONE'?'status-red':data.status==='OPTIMIZED'?'status-optimized':'status-immortal';
-                container.innerHTML=`
+        // =========================================
+        // PROFILE
+        // =========================================
+        async function loadProfile() {
+            if (!currentUser) return;
+            try {
+                const res = await fetch(`/api/v2/profile/${currentUser}`);
+                const data = await res.json();
+                const container = document.getElementById('profile-data');
+                const statusClass = data.status === 'WARNING' ? 'status-warning' :
+                    data.status === 'RED_ZONE' ? 'status-red' :
+                    data.status === 'OPTIMIZED' ? 'status-optimized' : 'status-immortal';
+                container.innerHTML = `
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]">
-                            <div class="flex items-center gap-4"><div class="avatar-lg text-4xl">${data.avatar||'🧬'}</div><div><div class="text-xl font-bold">${currentUser}</div><div class="text-sm text-gray-500">${data.email}</div></div></div>
+                            <div class="flex items-center gap-4">
+                                <div class="avatar-lg text-4xl">${data.avatar || '🧬'}</div>
+                                <div><div class="text-xl font-bold">${currentUser}</div><div class="text-sm text-gray-500">${data.email}</div></div>
+                            </div>
                             <div class="mt-4 space-y-1 text-sm">
                                 <p><span class="text-gray-500">Holat:</span> <span class="status-badge ${statusClass}">${data.status}</span></p>
                                 <p><span class="text-gray-500">Balans:</span> <strong class="text-[#43A047]">${data.balance.toFixed(2)} ${data.currency}</strong></p>
                                 <p><span class="text-gray-500">Salomatlik:</span> <strong class="text-[#43A047]">${data.health_score.toFixed(1)}%</strong></p>
-                                <p><span class="text-gray-500">Bio:</span> ${data.bio||'Yo\'q'}</p>
+                                <p><span class="text-gray-500">Bio:</span> ${data.bio || 'Yo\'q'}</p>
                             </div>
                         </div>
                         <div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]">
                             <h3 class="text-sm font-bold text-[#43A047]">📊 Statistika</h3>
-                            <div class="mt-3 space-y-1 text-sm"><p><span class="text-gray-500">Tokenlar:</span> <strong>${tokenBalance}</strong></p></div>
+                            <div class="mt-3 space-y-1 text-sm">
+                                <p><span class="text-gray-500">Tokenlar:</span> <strong>${tokenBalance}</strong></p>
+                            </div>
                         </div>
                     </div>
                 `;
-                document.getElementById('header-balance').innerText='$'+data.balance.toFixed(2);
-                document.getElementById('sidebar-balance').innerText=data.balance.toFixed(2);
-                document.getElementById('sidebar-status').innerText=data.status;
-                document.getElementById('sidebar-avatar').innerText=data.avatar||'🧬';
-                document.getElementById('header-avatar').innerText=data.avatar||'🧬';
-            }catch(e){console.error(e);}
+
+                document.getElementById('header-balance').innerText = '$' + data.balance.toFixed(2);
+                document.getElementById('sidebar-balance').innerText = data.balance.toFixed(2);
+                document.getElementById('sidebar-status').innerText = data.status;
+                document.getElementById('sidebar-avatar').innerText = data.avatar || '🧬';
+                document.getElementById('header-avatar').innerText = data.avatar || '🧬';
+
+            } catch (e) { console.error(e); }
         }
 
-        async function loadSocialFeed(){
-            if(!currentUser)return;
-            try{
-                const res=await fetch('/api/v2/social/posts');
-                const posts=await res.json();
-                const container=document.getElementById('social-feed');
-                container.innerHTML='';
-                document.getElementById('feed-badge').innerText=posts.length;
-                posts.forEach(p=>{
-                    const div=document.createElement('div');
-                    div.className='feed-item';
-                    div.innerHTML=`<div><span class="user">@${p.username}</span> <span class="time">${p.timestamp}</span></div><div>${p.content}</div><div class="actions"><span onclick="likePost('${p.id}')">❤️ ${p.likes||0}</span><span onclick="commentPost('${p.id}')">💬 ${p.comments?p.comments.length:0}</span></div>`;
+        // =========================================
+        // SOCIAL FEED
+        // =========================================
+        async function loadSocialFeed() {
+            if (!currentUser) return;
+            try {
+                const res = await fetch('/api/v2/social/posts');
+                const posts = await res.json();
+                const container = document.getElementById('social-feed');
+                container.innerHTML = '';
+                document.getElementById('feed-badge').innerText = posts.length;
+                posts.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = 'feed-item';
+                    div.innerHTML = `
+                        <div><span class="user">@${p.username}</span> <span class="time">${p.timestamp}</span></div>
+                        <div>${p.content}</div>
+                        <div class="actions">
+                            <span onclick="likePost('${p.id}')">❤️ ${p.likes || 0}</span>
+                            <span onclick="commentPost('${p.id}')">💬 ${p.comments ? p.comments.length : 0}</span>
+                        </div>
+                    `;
                     container.appendChild(div);
                 });
-            }catch(e){}
+            } catch (e) {}
         }
 
-        async function createSocialPost(){
-            if(!currentUser)return;
-            const input=document.getElementById('social-input');
-            if(!input.value.trim())return;
-            try{
-                const res=await fetch('/api/v2/social/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUser,content:input.value})});
-                if(res.ok){input.value='';loadSocialFeed();}
-            }catch(e){alert('Xatolik: '+e.message);}
+        async function createSocialPost() {
+            if (!currentUser) return;
+            const input = document.getElementById('social-input');
+            if (!input.value.trim()) return;
+            try {
+                const res = await fetch('/api/v2/social/post', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUser, content: input.value })
+                });
+                if (res.ok) {
+                    input.value = '';
+                    loadSocialFeed();
+                }
+            } catch (e) { alert('Xatolik: ' + e.message); }
         }
 
-        async function likePost(pid){if(!currentUser)return;try{await fetch('/api/v2/social/like',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUser,post_id:pid})});loadSocialFeed();}catch(e){}}
-        async function commentPost(pid){if(!currentUser)return;const comment=prompt('Komment:');if(!comment)return;try{await fetch('/api/v2/social/comment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUser,post_id:pid,comment:comment})});loadSocialFeed();}catch(e){alert(e.message);}}
-
-        async function sendConsult(){
-            if(!currentUser){openAuthModal('signin');return;}
-            const input=document.getElementById('consult-input');
-            const msg=input.value.trim();
-            if(!msg)return;
-            if(tokenBalance<3){alert('Token yetarli emas!');return;}
-            tokenBalance-=3;
-            const box=document.getElementById('consult-chat');
-            box.innerHTML+=`<div class="chat-msg user">${msg}</div>`;
-            input.value='';
-            box.scrollTop=box.scrollHeight;
-            try{
-                const res=await fetch('/api/v2/ai/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUser,message:msg})});
-                const data=await res.json();
-                if(data.success){box.innerHTML+=`<div class="chat-msg ai">${data.response}</div>`;loadProfile();}
-                else{box.innerHTML+=`<div class="chat-msg warning">${data.message}</div>`;}
-            }catch(e){box.innerHTML+=`<div class="chat-msg warning">${e.message}</div>`;}
-            box.scrollTop=box.scrollHeight;
+        async function likePost(pid) {
+            if (!currentUser) return;
+            try {
+                await fetch('/api/v2/social/like', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUser, post_id: pid })
+                });
+                loadSocialFeed();
+            } catch (e) {}
         }
 
-        document.addEventListener('keydown',(e)=>{if(e.key==='Enter'){if(document.activeElement?.id==='consult-input')sendConsult();if(document.activeElement?.id==='social-input')createSocialPost();}});
+        async function commentPost(pid) {
+            if (!currentUser) return;
+            const comment = prompt('Komment:');
+            if (!comment) return;
+            try {
+                await fetch('/api/v2/social/comment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUser, post_id: pid, comment: comment })
+                });
+                loadSocialFeed();
+            } catch (e) { alert(e.message); }
+        }
 
-        async function startCamera(){if(!currentUser){openAuthModal('signin');return;}try{const video=document.getElementById('camera-preview');const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});cameraStream=stream;video.srcObject=stream;video.style.display='block';document.getElementById('camera-placeholder').style.display='none';cameraActive=true;}catch(err){alert('Kamera yoqish xatosi: '+err.message);}}
-        function stopCamera(){if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null;}document.getElementById('camera-preview').style.display='none';document.getElementById('camera-placeholder').style.display='block';cameraActive=false;}
-        async function captureAndAnalyze(){if(!currentUser){openAuthModal('signin');return;}const video=document.getElementById('camera-preview');if(!cameraActive||video.style.display==='none'){alert('Kamerani yoqing!');return;}if(tokenBalance<10){alert('Token yetarli emas! (10 token)');return;}tokenBalance-=10;const canvas=document.createElement('canvas');canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext('2d').drawImage(video,0,0);const base64=canvas.toDataURL('image/jpeg');const result=document.getElementById('camera-result');result.innerText='⏳ Tahlil...';try{const res=await fetch('/api/v2/camera/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUser,department_id:1,image_data:base64})});const data=await res.json();if(data.success){result.innerText='🔬 '+data.analysis;loadProfile();}else{result.innerText='❌ '+data.message;}}catch(e){result.innerText='❌ '+e.message;}}
+        // =========================================
+        // CONSULTATION
+        // =========================================
+        async function sendConsult() {
+            if (!currentUser) { openAuthModal('signin'); return; }
+            const input = document.getElementById('consult-input');
+            const msg = input.value.trim();
+            if (!msg) return;
+            if (tokenBalance < 3) { alert('Token yetarli emas!'); return; }
+            tokenBalance -= 3;
+            const box = document.getElementById('consult-chat');
+            box.innerHTML += `<div class="chat-msg user">${msg}</div>`;
+            input.value = '';
+            box.scrollTop = box.scrollHeight;
 
-        function startVoice(){if(!currentUser){openAuthModal('signin');return;}if(!('webkitSpeechRecognition' in window)){alert('Brauzer ovozni qo‘llab-quvvatlamaydi');return;}if(voiceActive){stopVoice();return;}const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;recognition=new SpeechRecognition();recognition.lang='uz-UZ';recognition.continuous=true;recognition.interimResults=true;recognition.onstart=()=>{voiceActive=true;document.getElementById('voice-status').innerHTML='<span class="voice-indicator"></span> Aytishni boshlang...';};recognition.onresult=(event)=>{let final='';for(let i=event.resultIndex;i<event.results.length;i++){if(event.results[i].isFinal)final+=event.results[i][0].transcript;}if(final){document.getElementById('voice-transcript').innerText=final;document.getElementById('consult-input').value=final;sendConsult();}};recognition.onerror=(e)=>{console.error(e);stopVoice();};recognition.start();}
-        function stopVoice(){if(recognition){recognition.stop();recognition=null;}voiceActive=false;document.getElementById('voice-status').innerHTML='';}
+            try {
+                const res = await fetch('/api/v2/ai/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUser, message: msg })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    box.innerHTML += `<div class="chat-msg ai">${data.response}</div>`;
+                    loadProfile();
+                } else {
+                    box.innerHTML += `<div class="chat-msg warning">${data.message}</div>`;
+                }
+            } catch (e) { box.innerHTML += `<div class="chat-msg warning">${e.message}</div>`; }
+            box.scrollTop = box.scrollHeight;
+        }
 
-        async function loadHealthRanking(){try{const res=await fetch('/api/v2/health/ranking');const data=await res.json();const container=document.getElementById('health-ranking');container.innerHTML='';data.slice(0,10).forEach((item,idx)=>{const div=document.createElement('div');div.className='ranking-item';div.innerHTML=`<span class="pos">${idx+1}</span><span>${item.avatar||'🧬'}</span><span class="name">${item.username}</span><span class="score">${item.health_score}%</span>`;container.appendChild(div);});}catch(e){}}
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (document.activeElement?.id === 'consult-input') sendConsult();
+                if (document.activeElement?.id === 'social-input') createSocialPost();
+            }
+        });
 
-        async function loadStats(){try{const res=await fetch('/api/v2/system/stats');const data=await res.json();const container=document.getElementById('stats-content');container.innerHTML=`<div class="admin-stat"><div class="value">$${data.total_revenue||0}</div><div class="label">Daromad</div></div><div class="admin-stat"><div class="value" style="color:#43A047;">${data.active_users||0}</div><div class="label">Aktiv</div></div><div class="admin-stat"><div class="value" style="color:#FFB300;">${data.total_sales||0}</div><div class="label">Sotuv</div></div><div class="admin-stat"><div class="value" style="color:#43A047;">${data.total_social_posts||0}</div><div class="label">Post</div></div>`;}catch(e){}}
+        // ─── Camera ───
+        async function startCamera() {
+            if (!currentUser) { openAuthModal('signin'); return; }
+            try {
+                const video = document.getElementById('camera-preview');
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                cameraStream = stream;
+                video.srcObject = stream;
+                video.style.display = 'block';
+                document.getElementById('camera-placeholder').style.display = 'none';
+                cameraActive = true;
+            } catch (err) { alert('Kamera yoqish xatosi: ' + err.message); }
+        }
 
-        async function loadAdsPerformance(){try{const res=await fetch('/api/v2/ai/ads-performance');const data=await res.json();const container=document.getElementById('ads-performance');container.innerHTML='<div class="text-gray-400 text-sm">Hozircha kampaniya yo\'q</div>';}catch(e){}}
+        function stopCamera() {
+            if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop());
+                cameraStream = null; }
+            document.getElementById('camera-preview').style.display = 'none';
+            document.getElementById('camera-placeholder').style.display = 'block';
+            cameraActive = false;
+        }
 
-        function renderPackages(){const container=document.getElementById('package-grid');container.innerHTML=`<div class="package-card"><div class="pkg-name">1 Haftalik</div><div class="pkg-price">$999</div></div><div class="package-card"><div class="pkg-name">1 Oylik</div><div class="pkg-price">$9,999</div></div><div class="package-card"><div class="pkg-name">3 Oylik</div><div class="pkg-price">$299,999</div></div><div class="package-card"><div class="pkg-name">1 Yillik</div><div class="pkg-price">$1,199,999</div></div>`;}
+        async function captureAndAnalyze() {
+            if (!currentUser) { openAuthModal('signin'); return; }
+            const video = document.getElementById('camera-preview');
+            if (!cameraActive || video.style.display === 'none') { alert('Kamerani yoqing!'); return; }
+            if (tokenBalance < 10) { alert('Token yetarli emas! (10 token)'); return; }
+            tokenBalance -= 10;
 
-        async function loadNotifications(){if(!currentUser)return;try{const res=await fetch(`/api/v2/notifications/${currentUser}`);const data=await res.json();notifCount=data.filter(n=>!n.read).length;document.getElementById('notif-count').innerText=notifCount;const list=document.getElementById('notif-list');list.innerHTML='';data.slice(0,10).forEach(n=>{const div=document.createElement('div');div.className='notif-item'+(n.read?'':' unread');div.innerHTML=`<span class="time">${new Date(n.timestamp).toLocaleTimeString()}</span><div>${n.message}</div>`;list.appendChild(div);});}catch(e){}}
-        function toggleNotifications(){const dropdown=document.getElementById('notif-dropdown');dropdown.classList.toggle('show');if(dropdown.classList.contains('show')&&notifCount>0){fetch(`/api/v2/notifications/read/${currentUser}`,{method:'POST'});document.getElementById('notif-count').innerText='0';}}
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const base64 = canvas.toDataURL('image/jpeg');
 
-        async function adminLogin(){const user=document.getElementById('admin-user').value.trim();const pass=document.getElementById('admin-pass').value.trim();if(!user||!pass){alert('Admin ma\'lumotlarini kiriting!');return;}try{const res=await fetch('/api/v2/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})});const data=await res.json();if(data.success){document.getElementById('admin-content').classList.remove('hidden');adminLoadDashboard();}else{alert('Noto\'g\'ri admin ma\'lumotlari');}}catch(e){alert(e.message);}}
-        async function adminLoadDashboard(){try{const res=await fetch(`/api/v2/admin/dashboard?username=CEO&password=12345678`);const data=await res.json();const grid=document.getElementById('admin-stats-grid');grid.innerHTML=`<div class="admin-stat"><div class="value">${data.total_users||0}</div><div class="label">Foydalanuvchilar</div></div><div class="admin-stat"><div class="value" style="color:#FFB300;">$${data.total_revenue||0}</div><div class="label">Daromad</div></div>`;document.getElementById('admin-data').innerHTML=`<pre class="text-xs">${JSON.stringify(data,null,2)}</pre>`;}catch(e){}}
+            const result = document.getElementById('camera-result');
+            result.innerText = '⏳ Tahlil...';
+            try {
+                const res = await fetch('/api/v2/camera/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUser, department_id: 1, image_data: base64 })
+                });
+                const data = await res.json();
+                if (data.success) { result.innerText = '🔬 ' + data.analysis;
+                    loadProfile(); } else { result.innerText = '❌ ' + data.message; }
+            } catch (e) { result.innerText = '❌ ' + e.message; }
+        }
 
-        window.onload=function(){document.getElementById('main-app').style.display='none';document.querySelectorAll('.lock-overlay').forEach(el=>el.style.display='flex');openAuthModal('signin');};
-        document.getElementById('auth-modal').addEventListener('click',function(e){if(e.target===this)closeAuthModal();});
-        document.querySelectorAll('#auth-user, #auth-pass, #auth-email, #auth-curr').forEach(el=>{el.addEventListener('keydown',function(e){if(e.key==='Enter')executeAuth();});});
+        // ─── Voice ───
+        function startVoice() {
+            if (!currentUser) { openAuthModal('signin'); return; }
+            if (!('webkitSpeechRecognition' in window)) { alert('Brauzer ovozni qo‘llab-quvvatlamaydi'); return; }
+            if (voiceActive) { stopVoice(); return; }
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'uz-UZ';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.onstart = () => {
+                voiceActive = true;
+                document.getElementById('voice-status').innerHTML = '<span class="voice-indicator"></span> Aytishni boshlang...';
+            };
+            recognition.onresult = (event) => {
+                let final = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    if (event.results[i].isFinal) final += event.results[i][0].transcript;
+                }
+                if (final) {
+                    document.getElementById('voice-transcript').innerText = final;
+                    document.getElementById('consult-input').value = final;
+                    sendConsult();
+                }
+            };
+            recognition.onerror = (e) => { console.error(e);
+                stopVoice(); };
+            recognition.start();
+        }
+
+        function stopVoice() {
+            if (recognition) { recognition.stop();
+                recognition = null; }
+            voiceActive = false;
+            document.getElementById('voice-status').innerHTML = '';
+        }
+
+        // =========================================
+        // HEALTH RANKING
+        // =========================================
+        async function loadHealthRanking() {
+            try {
+                const res = await fetch('/api/v2/health/ranking');
+                const data = await res.json();
+                const container = document.getElementById('health-ranking');
+                container.innerHTML = '';
+                data.slice(0, 10).forEach((item, idx) => {
+                    const div = document.createElement('div');
+                    div.className = 'ranking-item';
+                    div.innerHTML = `
+                        <span class="pos">${idx + 1}</span>
+                        <span>${item.avatar || '🧬'}</span>
+                        <span class="name">${item.username}</span>
+                        <span class="score">${item.health_score}%</span>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (e) {}
+        }
+
+        // =========================================
+        // STATS
+        // =========================================
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/v2/system/stats');
+                const data = await res.json();
+                const container = document.getElementById('stats-content');
+                container.innerHTML = `
+                    <div class="admin-stat"><div class="value">$${data.total_revenue || 0}</div><div class="label">Daromad</div></div>
+                    <div class="admin-stat"><div class="value" style="color:#43A047;">${data.active_users || 0}</div><div class="label">Aktiv</div></div>
+                    <div class="admin-stat"><div class="value" style="color:#FFB300;">${data.total_sales || 0}</div><div class="label">Sotuv</div></div>
+                    <div class="admin-stat"><div class="value" style="color:#43A047;">${data.total_social_posts || 0}</div><div class="label">Post</div></div>
+                `;
+            } catch (e) {}
+        }
+
+        // =========================================
+        // ADS
+        // =========================================
+        async function loadAdsPerformance() {
+            try {
+                const res = await fetch('/api/v2/ai/ads-performance');
+                const data = await res.json();
+                const container = document.getElementById('ads-performance');
+                container.innerHTML = '<div class="text-gray-400 text-sm">Hozircha kampaniya yo\'q</div>';
+            } catch (e) {}
+        }
+
+        // =========================================
+        // PACKAGES
+        // =========================================
+        function renderPackages() {
+            const container = document.getElementById('package-grid');
+            container.innerHTML = `
+                <div class="package-card"><div class="pkg-name">1 Haftalik</div><div class="pkg-price">$999</div></div>
+                <div class="package-card"><div class="pkg-name">1 Oylik</div><div class="pkg-price">$9,999</div></div>
+                <div class="package-card"><div class="pkg-name">3 Oylik</div><div class="pkg-price">$299,999</div></div>
+                <div class="package-card"><div class="pkg-name">1 Yillik</div><div class="pkg-price">$1,199,999</div></div>
+            `;
+        }
+
+        // =========================================
+        // NOTIFICATIONS
+        // =========================================
+        async function loadNotifications() {
+            if (!currentUser) return;
+            try {
+                const res = await fetch(`/api/v2/notifications/${currentUser}`);
+                const data = await res.json();
+                notifCount = data.filter(n => !n.read).length;
+                document.getElementById('notif-count').innerText = notifCount;
+                const list = document.getElementById('notif-list');
+                list.innerHTML = '';
+                data.slice(0, 10).forEach(n => {
+                    const div = document.createElement('div');
+                    div.className = 'notif-item' + (n.read ? '' : ' unread');
+                    div.innerHTML = `
+                        <span class="time">${new Date(n.timestamp).toLocaleTimeString()}</span>
+                        <div>${n.message}</div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) {}
+        }
+
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notif-dropdown');
+            dropdown.classList.toggle('show');
+            if (dropdown.classList.contains('show') && notifCount > 0) {
+                fetch(`/api/v2/notifications/read/${currentUser}`, { method: 'POST' });
+                document.getElementById('notif-count').innerText = '0';
+            }
+        }
+
+        // =========================================
+        // ADMIN
+        // =========================================
+        async function adminLogin() {
+            const user = document.getElementById('admin-user').value.trim();
+            const pass = document.getElementById('admin-pass').value.trim();
+            if (!user || !pass) { alert('Admin ma\'lumotlarini kiriting!'); return; }
+            try {
+                const res = await fetch('/api/v2/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('admin-content').classList.remove('hidden');
+                    adminLoadDashboard();
+                } else { alert('Noto\'g\'ri admin ma\'lumotlari'); }
+            } catch (e) { alert(e.message); }
+        }
+
+        async function adminLoadDashboard() {
+            try {
+                const res = await fetch(`/api/v2/admin/dashboard?username=CEO&password=12345678`);
+                const data = await res.json();
+                const grid = document.getElementById('admin-stats-grid');
+                grid.innerHTML = `
+                    <div class="admin-stat"><div class="value">${data.total_users || 0}</div><div class="label">Foydalanuvchilar</div></div>
+                    <div class="admin-stat"><div class="value" style="color:#FFB300;">$${data.total_revenue || 0}</div><div class="label">Daromad</div></div>
+                `;
+                document.getElementById('admin-data').innerHTML = `<pre class="text-xs">${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (e) {}
+        }
+
+        // =========================================
+        // INIT
+        // =========================================
+        window.onload = function() {
+            document.getElementById('main-app').style.display = 'none';
+            document.querySelectorAll('.lock-overlay').forEach(el => el.style.display = 'flex');
+            openAuthModal('signin');
+        };
+
+        // Close modal on click outside
+        document.getElementById('auth-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeAuthModal();
+        });
+
+        // Enter key in auth inputs
+        document.querySelectorAll('#auth-user, #auth-pass, #auth-email, #auth-curr').forEach(el => {
+            el.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') executeAuth();
+            });
+        });
     </script>
 </body>
 </html>
