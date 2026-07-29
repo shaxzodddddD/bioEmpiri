@@ -20,7 +20,7 @@ try:
 except ImportError:
     GEMINI_AVAILABLE = False
 
-# ---------- KALITLAR (muhit o‘zgaruvchilaridan) ----------
+# ---------- KALITLAR ----------
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-1.5-flash"
@@ -41,7 +41,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------- BAZA (database_log.json) ----------
+# ---------- BAZA ----------
 DB_FILE = "database_log.json"
 db_lock = asyncio.Lock()
 
@@ -114,7 +114,7 @@ def track_user_activity(username: str, action: str, details: dict = None):
         db["user_activity"][username]["actions"] = db["user_activity"][username]["actions"][-100:]
     save_db(db)
 
-# ---------- AI CHAQIRUVLARI ----------
+# ---------- AI ----------
 async def call_groq_api(messages: List[dict]) -> Optional[str]:
     if not GROQ_API_KEY:
         return None
@@ -154,7 +154,7 @@ async def call_ai_api(messages: List[dict]) -> Optional[str]:
         return response
     return await call_groq_api(messages)
 
-# ---------- PYDANTIC MODELLAR ----------
+# ---------- PYDANTIC ----------
 class UserRegister(BaseModel):
     username: str = Field(..., min_length=2, max_length=30)
     email: str
@@ -198,7 +198,18 @@ HTML = """<!DOCTYPE html>
     <title>🧬 BioEmpire V13</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root { --bg: #E8F5E9; --accent: #66BB6A; --accent-dark: #43A047; --gold: #FFB300; --red: #E53935; --text: #1B3A1B; --muted: #4A6A4A; --glass: rgba(255,255,255,0.85); --border: rgba(102,187,106,0.3); --shadow: 0 8px 32px rgba(0,40,0,0.08); }
+        :root {
+            --bg: #E8F5E9;
+            --accent: #66BB6A;
+            --accent-dark: #43A047;
+            --gold: #FFB300;
+            --red: #E53935;
+            --text: #1B3A1B;
+            --muted: #4A6A4A;
+            --glass: rgba(255,255,255,0.85);
+            --border: rgba(102,187,106,0.3);
+            --shadow: 0 8px 32px rgba(0,40,0,0.08);
+        }
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',system-ui,sans-serif; }
         body { background:var(--bg); color:var(--text); min-height:100vh; }
         .glass { background:var(--glass); backdrop-filter:blur(8px); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow); padding:20px; transition:all 0.25s; }
@@ -246,7 +257,6 @@ HTML = """<!DOCTYPE html>
         .sidebar-btn.active { background:rgba(102,187,106,0.1); border-color:var(--accent); color:var(--accent-dark); font-weight:600; }
         .sidebar-btn .icon { font-size:20px; width:28px; text-align:center; }
         .sidebar-btn .badge { margin-left:auto; background:var(--red); color:#fff; font-size:10px; padding:0 8px; border-radius:30px; font-weight:700; }
-        .sidebar-divider { border-top:1px solid var(--border); margin:10px 0 12px; }
         .panel { display:none; animation:fadeSlide 0.3s ease; }
         .panel.active { display:block; }
         @keyframes fadeSlide { 0%{opacity:0;transform:translateY(10px);} 100%{opacity:1;transform:translateY(0);} }
@@ -741,4 +751,5 @@ async def admin_dashboard(username: str = None, password: str = None):
 # ============================================================
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5050))
+    print("🧬 BioEmpire V13 ishga tushdi, port:", port)
     uvicorn.run(app, host="0.0.0.0", port=port)
