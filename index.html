@@ -108,8 +108,6 @@
     </style>
 </head>
 <body>
-
-    <!-- ===== AUTH MODAL ===== -->
     <div id="auth-modal">
         <div class="auth-card">
             <button class="close-modal" onclick="closeAuthModal()">✕</button>
@@ -119,37 +117,16 @@
                 <button id="tab-signup" class="auth-tab active" onclick="switchAuth('signup')">Ro'yxatdan o'tish</button>
                 <button id="tab-signin" class="auth-tab" onclick="switchAuth('signin')">Kirish</button>
             </div>
-            <div id="email-group" class="input-group">
-                <label>📧 E-mail</label>
-                <input type="email" id="auth-email" placeholder="your@email.com" />
-            </div>
-            <div class="input-group">
-                <label>👤 Username</label>
-                <input type="text" id="auth-user" placeholder="Bio_User" />
-            </div>
-            <div class="input-group">
-                <label>🔑 Parol</label>
-                <input type="password" id="auth-pass" placeholder="••••••••" />
-            </div>
-            <div id="currency-group" class="input-group">
-                <label>💱 Valyuta</label>
-                <select id="auth-curr">
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="BTC">BTC</option>
-                    <option value="SOL">SOL</option>
-                </select>
-            </div>
+            <div id="email-group" class="input-group"><label>📧 E-mail</label><input type="email" id="auth-email" placeholder="your@email.com" /></div>
+            <div class="input-group"><label>👤 Username</label><input type="text" id="auth-user" placeholder="Bio_User" /></div>
+            <div class="input-group"><label>🔑 Parol</label><input type="password" id="auth-pass" placeholder="••••••••" /></div>
+            <div id="currency-group" class="input-group"><label>💱 Valyuta</label><select id="auth-curr"><option value="USD">USD</option><option value="EUR">EUR</option><option value="BTC">BTC</option><option value="SOL">SOL</option></select></div>
             <button class="btn btn-primary" style="width:100%;" onclick="executeAuth()">🚀 TIZIMNI FAOLASHTIRISH</button>
             <p id="auth-error" class="auth-error"></p>
             <div class="text-center mt-3 text-xs text-gray-500">Admin: CEO / parol: 12345678</div>
         </div>
     </div>
-
-    <!-- ===== MAIN APP ===== -->
     <div id="main-app" style="display:none;">
-
-        <!-- HEADER -->
         <header>
             <div class="logo" onclick="location.reload()"><span>🧬</span> BioEmpire ∞</div>
             <div class="auth-section" id="header-auth-section">
@@ -169,10 +146,7 @@
                 </div>
             </div>
         </header>
-
-        <!-- BODY -->
         <div class="flex">
-            <!-- SIDEBAR -->
             <aside class="sidebar" id="main-sidebar">
                 <div class="flex items-center gap-3 p-3 rounded-xl bg-[#F1F8E9] border border-[#66BB6A33] mb-4">
                     <div class="avatar-lg" id="sidebar-avatar">🧬</div>
@@ -187,684 +161,103 @@
                 <button class="sidebar-btn" data-panel="panel-ads" onclick="switchPanel('panel-ads', this)"><span class="icon">📈</span><span class="btn-text">AI ADS</span></button>
                 <button class="sidebar-btn" data-panel="panel-admin" onclick="switchPanel('panel-admin', this)"><span class="icon">⚙️</span><span class="btn-text">Admin</span></button>
             </aside>
-
-            <!-- CONTENT -->
             <main class="flex-1 min-w-0 p-4 max-w-full">
-
-                <!-- PANEL: Konsultatsiya -->
                 <div id="panel-consult" class="panel active">
                     <div class="glass panel-wrapper">
                         <div id="consult-lock" class="lock-overlay" style="display:none;"><div class="lock-icon">🔒</div><p>Iltimos, avval tizimga kiring</p><button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button></div>
                         <div id="consult-content">
                             <h2 class="text-xl font-bold text-[#43A047] mb-3">🩺 AI KONSULTATSIYA</h2>
-                            <div class="mb-4">
-                                <div class="flex gap-2 flex-wrap">
-                                    <button class="btn btn-primary btn-sm" onclick="startCamera()">📷 Kamerani yoqish</button>
-                                    <button class="btn btn-gold btn-sm" onclick="captureAndAnalyze()">🔬 Suratga olib tahlil</button>
-                                    <button class="btn btn-red btn-sm" onclick="stopCamera()">⏹ To'xtatish</button>
-                                </div>
-                                <video id="camera-preview" autoplay playsinline style="display:none;"></video>
-                                <div id="camera-placeholder" class="bg-gray-100 rounded-xl p-4 text-center text-gray-400 text-sm border border-dashed border-[#66BB6A33]">Kamera o'chirilgan</div>
-                                <div id="camera-result" class="mt-2 text-sm text-[#43A047]"></div>
-                            </div>
-                            <div class="mb-4">
-                                <button class="btn btn-primary btn-sm" onclick="startVoice()">🎤 Ovoz bilan gapirish</button>
-                                <button class="btn btn-red btn-sm" onclick="stopVoice()">⏹ To'xtatish</button>
-                                <span id="voice-status" class="text-sm text-gray-500"></span>
-                                <div id="voice-transcript" class="mt-2 p-3 bg-gray-50 rounded-xl text-sm text-gray-700 min-h-[48px] border border-[#66BB6A33]">Ovoz matni...</div>
-                            </div>
-                            <div>
-                                <div class="chat-terminal" id="consult-chat">
-                                    <div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing yoki gapiring.</div>
-                                </div>
-                                <div class="flex gap-2 mt-3">
-                                    <input id="consult-input" type="text" placeholder="Xabar yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" />
-                                    <button class="btn btn-primary btn-sm" onclick="sendConsult()">Yuborish</button>
-                                </div>
-                            </div>
+                            <div class="mb-4"><div class="flex gap-2 flex-wrap"><button class="btn btn-primary btn-sm" onclick="startCamera()">📷 Kamerani yoqish</button><button class="btn btn-gold btn-sm" onclick="captureAndAnalyze()">🔬 Suratga olib tahlil</button><button class="btn btn-red btn-sm" onclick="stopCamera()">⏹ To'xtatish</button></div><video id="camera-preview" autoplay playsinline style="display:none;"></video><div id="camera-placeholder" class="bg-gray-100 rounded-xl p-4 text-center text-gray-400 text-sm border border-dashed border-[#66BB6A33]">Kamera o'chirilgan</div><div id="camera-result" class="mt-2 text-sm text-[#43A047]"></div></div>
+                            <div class="mb-4"><button class="btn btn-primary btn-sm" onclick="startVoice()">🎤 Ovoz bilan gapirish</button><button class="btn btn-red btn-sm" onclick="stopVoice()">⏹ To'xtatish</button><span id="voice-status" class="text-sm text-gray-500"></span><div id="voice-transcript" class="mt-2 p-3 bg-gray-50 rounded-xl text-sm text-gray-700 min-h-[48px] border border-[#66BB6A33]">Ovoz matni...</div></div>
+                            <div><div class="chat-terminal" id="consult-chat"><div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing yoki gapiring.</div></div><div class="flex gap-2 mt-3"><input id="consult-input" type="text" placeholder="Xabar yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" /><button class="btn btn-primary btn-sm" onclick="sendConsult()">Yuborish</button></div></div>
                         </div>
                     </div>
                 </div>
-
-                <!-- PANEL: Ijtimoiy -->
                 <div id="panel-social" class="panel">
                     <div class="glass panel-wrapper">
                         <div id="social-lock" class="lock-overlay" style="display:none;"><div class="lock-icon">🔒</div><p>Ijtimoiy tarmoqdan foydalanish uchun tizimga kiring</p><button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button></div>
-                        <div id="social-content">
-                            <h2 class="text-xl font-bold text-[#43A047] mb-3">📡 Ijtimoiy tarmoq</h2>
-                            <div class="flex gap-2 mb-4">
-                                <input id="social-input" type="text" placeholder="Holatingiz haqida yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" />
-                                <button class="btn btn-primary btn-sm" onclick="createSocialPost()">Yozish</button>
-                            </div>
-                            <div id="social-feed" class="max-h-[520px] overflow-y-auto"></div>
-                        </div>
+                        <div id="social-content"><h2 class="text-xl font-bold text-[#43A047] mb-3">📡 Ijtimoiy tarmoq</h2><div class="flex gap-2 mb-4"><input id="social-input" type="text" placeholder="Holatingiz haqida yozing..." class="flex-1 bg-white border border-[#66BB6A33] rounded-xl px-4 py-2 text-sm text-[#1B3A1B] outline-none" /><button class="btn btn-primary btn-sm" onclick="createSocialPost()">Yozish</button></div><div id="social-feed" class="max-h-[520px] overflow-y-auto"></div></div>
                     </div>
                 </div>
-
-                <!-- PANEL: Profil -->
                 <div id="panel-profile" class="panel">
-                    <div class="glass panel-wrapper">
-                        <div id="profile-lock" class="lock-overlay" style="display:none;"><div class="lock-icon">🔒</div><p>Profilni ko'rish uchun tizimga kiring</p><button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button></div>
-                        <div id="profile-content">
-                            <h2 class="text-xl font-bold text-[#43A047] mb-3">👤 Profil</h2>
-                            <div id="profile-data"></div>
-                        </div>
-                    </div>
+                    <div class="glass panel-wrapper"><div id="profile-lock" class="lock-overlay" style="display:none;"><div class="lock-icon">🔒</div><p>Profilni ko'rish uchun tizimga kiring</p><button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button></div><div id="profile-content"><h2 class="text-xl font-bold text-[#43A047] mb-3">👤 Profil</h2><div id="profile-data"></div></div></div>
                 </div>
-
-                <!-- PANEL: Paketlar -->
                 <div id="panel-packages" class="panel">
-                    <div class="glass panel-wrapper">
-                        <div id="packages-lock" class="lock-overlay" style="display:none;"><div class="lock-icon">🔒</div><p>Paketlarni ko'rish uchun tizimga kiring</p><button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button></div>
-                        <div id="packages-content">
-                            <h2 class="text-xl font-bold text-[#FFB300] mb-3">📦 Paketlar</h2>
-                            <div class="package-grid" id="package-grid"></div>
-                        </div>
-                    </div>
+                    <div class="glass panel-wrapper"><div id="packages-lock" class="lock-overlay" style="display:none;"><div class="lock-icon">🔒</div><p>Paketlarni ko'rish uchun tizimga kiring</p><button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button></div><div id="packages-content"><h2 class="text-xl font-bold text-[#FFB300] mb-3">📦 Paketlar</h2><div class="package-grid" id="package-grid"></div></div></div>
                 </div>
-
-                <!-- PANEL: Statistika -->
                 <div id="panel-stats" class="panel">
-                    <div class="glass panel-wrapper">
-                        <div id="stats-lock" class="lock-overlay" style="display:none;"><div class="lock-icon">🔒</div><p>Statistikani ko'rish uchun tizimga kiring</p><button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button></div>
-                        <div id="stats-content-full">
-                            <h2 class="text-xl font-bold text-[#43A047] mb-3">📊 Statistika</h2>
-                            <div id="stats-content" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-                            <div class="mt-4">
-                                <h3 class="text-sm font-bold text-[#43A047]">🏅 Salomatlik reytingi</h3>
-                                <div id="health-ranking" class="max-h-[200px] overflow-y-auto"></div>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="glass panel-wrapper"><div id="stats-lock" class="lock-overlay" style="display:none;"><div class="lock-icon">🔒</div><p>Statistikani ko'rish uchun tizimga kiring</p><button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button></div><div id="stats-content-full"><h2 class="text-xl font-bold text-[#43A047] mb-3">📊 Statistika</h2><div id="stats-content" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div><div class="mt-4"><h3 class="text-sm font-bold text-[#43A047]">🏅 Salomatlik reytingi</h3><div id="health-ranking" class="max-h-[200px] overflow-y-auto"></div></div></div></div>
                 </div>
-
-                <!-- PANEL: AI ADS -->
                 <div id="panel-ads" class="panel">
-                    <div class="glass panel-wrapper">
-                        <div id="ads-lock" class="lock-overlay" style="display:none;"><div class="lock-icon">🔒</div><p>AI ADS ni ko'rish uchun tizimga kiring</p><button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button></div>
-                        <div id="ads-content">
-                            <h2 class="text-xl font-bold text-[#43A047] mb-3">📈 AI ADS</h2>
-                            <div id="ads-performance" class="space-y-2 max-h-[500px] overflow-y-auto"></div>
-                            <button class="btn btn-primary btn-sm mt-3" onclick="loadAdsPerformance()">🔄 Yangilash</button>
-                        </div>
-                    </div>
+                    <div class="glass panel-wrapper"><div id="ads-lock" class="lock-overlay" style="display:none;"><div class="lock-icon">🔒</div><p>AI ADS ni ko'rish uchun tizimga kiring</p><button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button></div><div id="ads-content"><h2 class="text-xl font-bold text-[#43A047] mb-3">📈 AI ADS</h2><div id="ads-performance" class="space-y-2 max-h-[500px] overflow-y-auto"></div><button class="btn btn-primary btn-sm mt-3" onclick="loadAdsPerformance()">🔄 Yangilash</button></div></div>
                 </div>
-
-                <!-- PANEL: Admin -->
                 <div id="panel-admin" class="panel">
-                    <div class="glass panel-wrapper">
-                        <div id="admin-lock" class="lock-overlay" style="display:none;"><div class="lock-icon">🔒</div><p>Admin paneliga kirish uchun tizimga kiring</p><button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button></div>
-                        <div id="admin-content-full">
-                            <h2 class="text-xl font-bold text-[#FFB300] mb-3">⚙️ Admin</h2>
-                            <div class="flex gap-2 mb-4">
-                                <input id="admin-user" type="text" placeholder="Admin" value="CEO" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" />
-                                <input id="admin-pass" type="password" placeholder="Parol" value="12345678" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" />
-                                <button class="btn btn-primary btn-sm" onclick="adminLogin()">🔐 Kirish</button>
-                            </div>
-                            <div id="admin-content" class="hidden">
-                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" id="admin-stats-grid"></div>
-                                <div id="admin-data" class="mt-3 max-h-[300px] overflow-y-auto text-sm"></div>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="glass panel-wrapper"><div id="admin-lock" class="lock-overlay" style="display:none;"><div class="lock-icon">🔒</div><p>Admin paneliga kirish uchun tizimga kiring</p><button class="btn btn-primary btn-sm" onclick="openAuthModal('signin')">Kirish</button></div><div id="admin-content-full"><h2 class="text-xl font-bold text-[#FFB300] mb-3">⚙️ Admin</h2><div class="flex gap-2 mb-4"><input id="admin-user" type="text" placeholder="Admin" value="CEO" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" /><input id="admin-pass" type="password" placeholder="Parol" value="12345678" class="bg-white border border-[#66BB6A33] rounded-xl px-3 py-1 text-sm outline-none" /><button class="btn btn-primary btn-sm" onclick="adminLogin()">🔐 Kirish</button></div><div id="admin-content" class="hidden"><div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" id="admin-stats-grid"></div><div id="admin-data" class="mt-3 max-h-[300px] overflow-y-auto text-sm"></div></div></div></div>
                 </div>
-
             </main>
         </div>
     </div>
-
-    <!-- ===== JAVASCRIPT ===== -->
     <script>
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // GLOBAL STATE
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        let currentUser = null;
-        let authMode = 'signup';
-        let tokenBalance = 100;
-        let notifCount = 0;
-        let cameraStream = null;
-        let cameraActive = false;
-        let recognition = null;
-        let voiceActive = false;
-        let isAuthenticated = false;
+        // To'liq JavaScript (avvalgi xabarlardagi kabi)
+        let currentUser = null, authMode = 'signup', tokenBalance = 100, notifCount = 0;
+        let cameraStream = null, cameraActive = false, recognition = null, voiceActive = false, isAuthenticated = false;
 
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // AUTH MODAL
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        function openAuthModal(mode) {
-            if (mode) switchAuth(mode);
-            document.getElementById('auth-modal').classList.add('show');
-            document.body.style.overflow = 'hidden';
+        function openAuthModal(m){if(m)switchAuth(m);document.getElementById('auth-modal').classList.add('show');document.body.style.overflow='hidden';}
+        function closeAuthModal(){document.getElementById('auth-modal').classList.remove('show');document.body.style.overflow='';}
+        function switchAuth(m){authMode=m;document.getElementById('auth-modal-title').innerText=m==='signup'?'🔐 RO\'YXATDAN O\'TISH':'🔐 KIRISH';document.querySelectorAll('.auth-tab').forEach(el=>el.classList.remove('active'));document.getElementById('tab-'+m).classList.add('active');document.getElementById('email-group').style.display=m==='signup'?'block':'none';document.getElementById('currency-group').style.display=m==='signup'?'block':'none';document.getElementById('auth-error').innerText='';}
+
+        async function executeAuth(){
+            const user=document.getElementById('auth-user').value.trim(), pass=document.getElementById('auth-pass').value, email=document.getElementById('auth-email').value.trim(), curr=document.getElementById('auth-curr').value, errEl=document.getElementById('auth-error'); errEl.innerText='';
+            if(!user){errEl.innerText="Username kiritilmagan!";return;} if(!pass||pass.length<6){errEl.innerText="Parol kamida 6 belgi!";return;} if(authMode==='signup'&&!email){errEl.innerText="Email kiritilmagan!";return;}
+            const url=authMode==='signup'?'/api/v2/auth/signup':'/api/v2/auth/signin', body=authMode==='signup'?{username:user,password:pass,email:email,currency:curr}:{username:user,password:pass};
+            try{const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await res.json();if(!res.ok){errEl.innerText=data.detail||"Server xatosi.";return;} if(data.status!=='success'){errEl.innerText=data.message||"Noma'lum xatolik.";return;}
+            isAuthenticated=true; currentUser=data.username; closeAuthModal(); document.getElementById('main-app').style.display='block'; document.getElementById('auth-buttons').style.display='none'; document.getElementById('user-info').style.display='flex'; document.getElementById('header-username').innerText=currentUser; document.getElementById('header-balance').innerText='$'+data.balance.toFixed(2); document.getElementById('header-avatar').innerText=data.avatar||'🧬';
+            document.getElementById('sidebar-username').innerText=currentUser; document.getElementById('sidebar-balance').innerText=data.balance.toFixed(2); document.getElementById('sidebar-status').innerText=data.status||'WARNING'; document.getElementById('sidebar-avatar').innerText=data.avatar||'🧬';
+            document.querySelectorAll('.lock-overlay').forEach(el=>el.style.display='none'); loadProfile(); loadSocialFeed(); loadHealthRanking(); loadStats(); loadAdsPerformance(); renderPackages(); loadNotifications();
+            setInterval(loadSocialFeed,8000); setInterval(loadHealthRanking,15000); setInterval(loadNotifications,10000); setInterval(loadAdsPerformance,30000);
+            }catch(e){errEl.innerText="Tarmoq xatosi: "+e.message; console.error(e);}
         }
 
-        function closeAuthModal() {
-            document.getElementById('auth-modal').classList.remove('show');
-            document.body.style.overflow = '';
-        }
+        function logout(){isAuthenticated=false; currentUser=null; document.getElementById('auth-buttons').style.display='flex'; document.getElementById('user-info').style.display='none'; document.getElementById('main-app').style.display='none'; document.querySelectorAll('.lock-overlay').forEach(el=>el.style.display='flex'); if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null;} if(recognition){recognition.stop();recognition=null;} cameraActive=false; voiceActive=false; document.getElementById('consult-chat').innerHTML='<div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing yoki gapiring.</div>'; openAuthModal('signin');}
 
-        function switchAuth(mode) {
-            authMode = mode;
-            document.getElementById('auth-modal-title').innerText = mode === 'signup' ? '🔐 RO\'YXATDAN O\'TISH' : '🔐 KIRISH';
-            document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
-            document.getElementById('tab-' + mode).classList.add('active');
-            document.getElementById('email-group').style.display = mode === 'signup' ? 'block' : 'none';
-            document.getElementById('currency-group').style.display = mode === 'signup' ? 'block' : 'none';
-            document.getElementById('auth-error').innerText = '';
-        }
+        function switchPanel(pid,btn){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active')); document.getElementById(pid).classList.add('active'); document.querySelectorAll('.sidebar-btn[data-panel]').forEach(b=>b.classList.remove('active')); if(btn)btn.classList.add('active'); if(!isAuthenticated){const panel=document.getElementById(pid); const lock=panel.querySelector('.lock-overlay'); if(lock)lock.style.display='flex';}else{const panel=document.getElementById(pid); const lock=panel.querySelector('.lock-overlay'); if(lock)lock.style.display='none';} if(isAuthenticated){if(pid==='panel-profile')loadProfile(); if(pid==='panel-social')loadSocialFeed(); if(pid==='panel-stats'){loadStats();loadHealthRanking();} if(pid==='panel-ads')loadAdsPerformance(); if(pid==='panel-packages')renderPackages();}}
 
-        async function executeAuth() {
-            const user = document.getElementById('auth-user').value.trim();
-            const pass = document.getElementById('auth-pass').value;
-            const email = document.getElementById('auth-email').value.trim();
-            const curr = document.getElementById('auth-curr').value;
-            const errEl = document.getElementById('auth-error');
-            errEl.innerText = '';
+        async function loadProfile(){if(!currentUser)return; try{const res=await fetch('/api/v2/profile/'+currentUser); const data=await res.json(); const container=document.getElementById('profile-data'); const sc=data.status==='WARNING'?'status-warning':data.status==='RED_ZONE'?'status-red':data.status==='OPTIMIZED'?'status-optimized':'status-immortal'; container.innerHTML='<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]"><div class="flex items-center gap-4"><div class="avatar-lg text-4xl">'+(data.avatar||'🧬')+'</div><div><div class="text-xl font-bold">'+currentUser+'</div><div class="text-sm text-gray-500">'+data.email+'</div></div></div><div class="mt-4 space-y-1 text-sm"><p><span class="text-gray-500">Holat:</span> <span class="status-badge '+sc+'">'+data.status+'</span></p><p><span class="text-gray-500">Balans:</span> <strong class="text-[#43A047]">'+data.balance.toFixed(2)+' '+data.currency+'</strong></p><p><span class="text-gray-500">Salomatlik:</span> <strong class="text-[#43A047]">'+data.health_score.toFixed(1)+'%</strong></p><p><span class="text-gray-500">Bio:</span> '+(data.bio||'Yo\'q')+'</p></div></div><div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]"><h3 class="text-sm font-bold text-[#43A047]">📊 Statistika</h3><div class="mt-3 space-y-1 text-sm"><p><span class="text-gray-500">Tokenlar:</span> <strong>'+tokenBalance+'</strong></p></div></div></div>'; document.getElementById('header-balance').innerText='$'+data.balance.toFixed(2); document.getElementById('sidebar-balance').innerText=data.balance.toFixed(2); document.getElementById('sidebar-status').innerText=data.status; document.getElementById('sidebar-avatar').innerText=data.avatar||'🧬'; document.getElementById('header-avatar').innerText=data.avatar||'🧬'; }catch(e){console.error(e);}}
 
-            if (!user) { errEl.innerText = "Username kiritilmagan!"; return; }
-            if (!pass || pass.length < 6) { errEl.innerText = "Parol kamida 6 belgi!"; return; }
-            if (authMode === 'signup' && !email) { errEl.innerText = "Email kiritilmagan!"; return; }
+        async function loadSocialFeed(){if(!currentUser)return; try{const res=await fetch('/api/v2/social/posts'); const posts=await res.json(); const container=document.getElementById('social-feed'); container.innerHTML=''; document.getElementById('feed-badge').innerText=posts.length; posts.forEach(p=>{const div=document.createElement('div'); div.className='feed-item'; div.innerHTML='<div><span class="user">@'+p.username+'</span> <span class="time">'+p.timestamp+'</span></div><div>'+p.content+'</div><div class="actions"><span onclick="likePost(\''+p.id+'\')">❤️ '+(p.likes||0)+'</span><span onclick="commentPost(\''+p.id+'\')">💬 '+(p.comments?p.comments.length:0)+'</span></div>'; container.appendChild(div);});}catch(e){}}
 
-            const url = authMode === 'signup' ? '/api/v2/auth/signup' : '/api/v2/auth/signin';
-            const body = authMode === 'signup' ?
-                { username: user, password: pass, email: email, currency: curr } :
-                { username: user, password: pass };
+        async function createSocialPost(){if(!currentUser)return; const input=document.getElementById('social-input'); if(!input.value.trim())return; try{const res=await fetch('/api/v2/social/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUser,content:input.value})}); if(res.ok){input.value=''; loadSocialFeed();}}catch(e){alert('Xatolik: '+e.message);}}
+        async function likePost(pid){if(!currentUser)return; try{await fetch('/api/v2/social/like',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUser,post_id:pid})}); loadSocialFeed();}catch(e){}}
+        async function commentPost(pid){if(!currentUser)return; const comment=prompt('Komment:'); if(!comment)return; try{await fetch('/api/v2/social/comment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUser,post_id:pid,comment:comment})}); loadSocialFeed();}catch(e){alert(e.message);}}
 
-            try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                    errEl.innerText = data.detail || "Server xatosi.";
-                    return;
-                }
-                if (data.status !== 'success') {
-                    errEl.innerText = data.message || "Noma'lum xatolik.";
-                    return;
-                }
+        async function sendConsult(){if(!currentUser){openAuthModal('signin');return;} const input=document.getElementById('consult-input'); const msg=input.value.trim(); if(!msg)return; if(tokenBalance<3){alert('Token yetarli emas!');return;} tokenBalance-=3; const box=document.getElementById('consult-chat'); box.innerHTML+='<div class="chat-msg user">'+msg+'</div>'; input.value=''; box.scrollTop=box.scrollHeight; try{const res=await fetch('/api/v2/ai/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUser,message:msg})}); const data=await res.json(); if(data.success){box.innerHTML+='<div class="chat-msg ai">'+data.response+'</div>'; loadProfile();}else{box.innerHTML+='<div class="chat-msg warning">'+data.message+'</div>';}}catch(e){box.innerHTML+='<div class="chat-msg warning">'+e.message+'</div>';} box.scrollTop=box.scrollHeight;}
 
-                isAuthenticated = true;
-                currentUser = data.username;
-                closeAuthModal();
+        document.addEventListener('keydown',(e)=>{if(e.key==='Enter'){if(document.activeElement?.id==='consult-input')sendConsult(); if(document.activeElement?.id==='social-input')createSocialPost();}});
 
-                document.getElementById('main-app').style.display = 'block';
-                document.getElementById('auth-buttons').style.display = 'none';
-                document.getElementById('user-info').style.display = 'flex';
-                document.getElementById('header-username').innerText = currentUser;
-                document.getElementById('header-balance').innerText = '$' + data.balance.toFixed(2);
-                document.getElementById('header-avatar').innerText = data.avatar || '🧬';
+        async function startCamera(){if(!currentUser){openAuthModal('signin');return;} try{const video=document.getElementById('camera-preview'); const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); cameraStream=stream; video.srcObject=stream; video.style.display='block'; document.getElementById('camera-placeholder').style.display='none'; cameraActive=true;}catch(err){alert('Kamera yoqish xatosi: '+err.message);}}
+        function stopCamera(){if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop()); cameraStream=null;} document.getElementById('camera-preview').style.display='none'; document.getElementById('camera-placeholder').style.display='block'; cameraActive=false;}
+        async function captureAndAnalyze(){if(!currentUser){openAuthModal('signin');return;} const video=document.getElementById('camera-preview'); if(!cameraActive||video.style.display==='none'){alert('Kamerani yoqing!');return;} if(tokenBalance<10){alert('Token yetarli emas! (10 token)');return;} tokenBalance-=10; const canvas=document.createElement('canvas'); canvas.width=video.videoWidth; canvas.height=video.videoHeight; canvas.getContext('2d').drawImage(video,0,0); const base64=canvas.toDataURL('image/jpeg'); const result=document.getElementById('camera-result'); result.innerText='⏳ Tahlil...'; try{const res=await fetch('/api/v2/camera/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUser,department_id:1,image_data:base64})}); const data=await res.json(); if(data.success){result.innerText='🔬 '+data.analysis; loadProfile();}else{result.innerText='❌ '+data.message;}}catch(e){result.innerText='❌ '+e.message;}}
 
-                document.getElementById('sidebar-username').innerText = currentUser;
-                document.getElementById('sidebar-balance').innerText = data.balance.toFixed(2);
-                document.getElementById('sidebar-status').innerText = data.status || 'WARNING';
-                document.getElementById('sidebar-avatar').innerText = data.avatar || '🧬';
+        function startVoice(){if(!currentUser){openAuthModal('signin');return;} if(!('webkitSpeechRecognition' in window)){alert('Brauzer ovozni qo‘llab-quvvatlamaydi');return;} if(voiceActive){stopVoice();return;} const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition; recognition=new SpeechRecognition(); recognition.lang='uz-UZ'; recognition.continuous=true; recognition.interimResults=true; recognition.onstart=()=>{voiceActive=true; document.getElementById('voice-status').innerHTML='<span class="voice-indicator"></span> Aytishni boshlang...';}; recognition.onresult=(event)=>{let final=''; for(let i=event.resultIndex;i<event.results.length;i++){if(event.results[i].isFinal)final+=event.results[i][0].transcript;} if(final){document.getElementById('voice-transcript').innerText=final; document.getElementById('consult-input').value=final; sendConsult();}}; recognition.onerror=(e)=>{console.error(e); stopVoice();}; recognition.start();}
+        function stopVoice(){if(recognition){recognition.stop(); recognition=null;} voiceActive=false; document.getElementById('voice-status').innerHTML='';}
 
-                document.querySelectorAll('.lock-overlay').forEach(el => el.style.display = 'none');
+        async function loadHealthRanking(){try{const res=await fetch('/api/v2/health/ranking'); const data=await res.json(); const container=document.getElementById('health-ranking'); container.innerHTML=''; data.slice(0,10).forEach((item,idx)=>{const div=document.createElement('div'); div.className='ranking-item'; div.innerHTML='<span class="pos">'+(idx+1)+'</span><span>'+(item.avatar||'🧬')+'</span><span class="name">'+item.username+'</span><span class="score">'+item.health_score+'%</span>'; container.appendChild(div);});}catch(e){}}
 
-                loadProfile();
-                loadSocialFeed();
-                loadHealthRanking();
-                loadStats();
-                loadAdsPerformance();
-                renderPackages();
-                loadNotifications();
+        async function loadStats(){try{const res=await fetch('/api/v2/system/stats'); const data=await res.json(); const container=document.getElementById('stats-content'); container.innerHTML='<div class="admin-stat"><div class="value">$'+(data.total_revenue||0)+'</div><div class="label">Daromad</div></div><div class="admin-stat"><div class="value" style="color:#43A047;">'+(data.active_users||0)+'</div><div class="label">Aktiv</div></div><div class="admin-stat"><div class="value" style="color:#FFB300;">'+(data.total_sales||0)+'</div><div class="label">Sotuv</div></div><div class="admin-stat"><div class="value" style="color:#43A047;">'+(data.total_social_posts||0)+'</div><div class="label">Post</div></div>';}catch(e){}}
 
-                setInterval(loadSocialFeed, 8000);
-                setInterval(loadHealthRanking, 15000);
-                setInterval(loadNotifications, 10000);
-                setInterval(loadAdsPerformance, 30000);
+        async function loadAdsPerformance(){try{const res=await fetch('/api/v2/ai/ads-performance'); const data=await res.json(); const container=document.getElementById('ads-performance'); container.innerHTML='<div class="text-gray-400 text-sm">Hozircha kampaniya yo\'q</div>';}catch(e){}}
 
-            } catch (e) {
-                errEl.innerText = "Tarmoq xatosi: " + e.message;
-                console.error(e);
-            }
-        }
+        function renderPackages(){const container=document.getElementById('package-grid'); container.innerHTML='<div class="package-card"><div class="pkg-name">1 Haftalik</div><div class="pkg-price">$999</div></div><div class="package-card"><div class="pkg-name">1 Oylik</div><div class="pkg-price">$9,999</div></div><div class="package-card"><div class="pkg-name">3 Oylik</div><div class="pkg-price">$299,999</div></div><div class="package-card"><div class="pkg-name">1 Yillik</div><div class="pkg-price">$1,199,999</div></div>';}
 
-        function logout() {
-            isAuthenticated = false;
-            currentUser = null;
-            document.getElementById('auth-buttons').style.display = 'flex';
-            document.getElementById('user-info').style.display = 'none';
-            document.getElementById('main-app').style.display = 'none';
+        async function loadNotifications(){if(!currentUser)return; try{const res=await fetch('/api/v2/notifications/'+currentUser); const data=await res.json(); notifCount=data.filter(n=>!n.read).length; document.getElementById('notif-count').innerText=notifCount; const list=document.getElementById('notif-list'); list.innerHTML=''; data.slice(0,10).forEach(n=>{const div=document.createElement('div'); div.className='notif-item'+(n.read?'':' unread'); div.innerHTML='<span class="time">'+new Date(n.timestamp).toLocaleTimeString()+'</span><div>'+n.message+'</div>'; list.appendChild(div);});}catch(e){}}
+        function toggleNotifications(){const dropdown=document.getElementById('notif-dropdown'); dropdown.classList.toggle('show'); if(dropdown.classList.contains('show')&&notifCount>0){fetch('/api/v2/notifications/read/'+currentUser,{method:'POST'}); document.getElementById('notif-count').innerText='0';}}
 
-            document.querySelectorAll('.lock-overlay').forEach(el => el.style.display = 'flex');
+        async function adminLogin(){const user=document.getElementById('admin-user').value.trim(); const pass=document.getElementById('admin-pass').value.trim(); if(!user||!pass){alert('Admin ma\'lumotlarini kiriting!');return;} try{const res=await fetch('/api/v2/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})}); const data=await res.json(); if(data.success){document.getElementById('admin-content').classList.remove('hidden'); adminLoadDashboard();}else{alert('Noto\'g\'ri admin ma\'lumotlari');}}catch(e){alert(e.message);}}
+        async function adminLoadDashboard(){try{const res=await fetch('/api/v2/admin/dashboard?username=CEO&password=12345678'); const data=await res.json(); const grid=document.getElementById('admin-stats-grid'); grid.innerHTML='<div class="admin-stat"><div class="value">'+(data.total_users||0)+'</div><div class="label">Foydalanuvchilar</div></div><div class="admin-stat"><div class="value" style="color:#FFB300;">$'+(data.total_revenue||0)+'</div><div class="label">Daromad</div></div>'; document.getElementById('admin-data').innerHTML='<pre class="text-xs">'+JSON.stringify(data,null,2)+'</pre>';}catch(e){}}
 
-            if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop());
-                cameraStream = null; }
-            if (recognition) { recognition.stop();
-                recognition = null; }
-            cameraActive = false;
-            voiceActive = false;
-
-            document.getElementById('consult-chat').innerHTML = `
-                <div class="chat-msg ai">Salom! Men AI shifokorman. Simptomlaringizni yozing yoki gapiring.</div>
-            `;
-
-            openAuthModal('signin');
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // PANEL SWITCH
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        function switchPanel(panelId, btn) {
-            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            document.getElementById(panelId).classList.add('active');
-            document.querySelectorAll('.sidebar-btn[data-panel]').forEach(b => b.classList.remove('active'));
-            if (btn) btn.classList.add('active');
-
-            if (!isAuthenticated) {
-                const panel = document.getElementById(panelId);
-                const lock = panel.querySelector('.lock-overlay');
-                if (lock) lock.style.display = 'flex';
-            } else {
-                const panel = document.getElementById(panelId);
-                const lock = panel.querySelector('.lock-overlay');
-                if (lock) lock.style.display = 'none';
-            }
-
-            if (isAuthenticated) {
-                if (panelId === 'panel-profile') loadProfile();
-                if (panelId === 'panel-social') loadSocialFeed();
-                if (panelId === 'panel-stats') { loadStats();
-                    loadHealthRanking(); }
-                if (panelId === 'panel-ads') loadAdsPerformance();
-                if (panelId === 'panel-packages') renderPackages();
-            }
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // PROFILE
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        async function loadProfile() {
-            if (!currentUser) return;
-            try {
-                const res = await fetch(`/api/v2/profile/${currentUser}`);
-                const data = await res.json();
-                const container = document.getElementById('profile-data');
-                const statusClass = data.status === 'WARNING' ? 'status-warning' :
-                    data.status === 'RED_ZONE' ? 'status-red' :
-                    data.status === 'OPTIMIZED' ? 'status-optimized' : 'status-immortal';
-                container.innerHTML = `
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]">
-                            <div class="flex items-center gap-4">
-                                <div class="avatar-lg text-4xl">${data.avatar || '🧬'}</div>
-                                <div><div class="text-xl font-bold">${currentUser}</div><div class="text-sm text-gray-500">${data.email}</div></div>
-                            </div>
-                            <div class="mt-4 space-y-1 text-sm">
-                                <p><span class="text-gray-500">Holat:</span> <span class="status-badge ${statusClass}">${data.status}</span></p>
-                                <p><span class="text-gray-500">Balans:</span> <strong class="text-[#43A047]">${data.balance.toFixed(2)} ${data.currency}</strong></p>
-                                <p><span class="text-gray-500">Salomatlik:</span> <strong class="text-[#43A047]">${data.health_score.toFixed(1)}%</strong></p>
-                                <p><span class="text-gray-500">Bio:</span> ${data.bio || 'Yo\'q'}</p>
-                            </div>
-                        </div>
-                        <div class="bg-white/70 p-5 rounded-xl border border-[#66BB6A33]">
-                            <h3 class="text-sm font-bold text-[#43A047]">📊 Statistika</h3>
-                            <div class="mt-3 space-y-1 text-sm">
-                                <p><span class="text-gray-500">Tokenlar:</span> <strong>${tokenBalance}</strong></p>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                document.getElementById('header-balance').innerText = '$' + data.balance.toFixed(2);
-                document.getElementById('sidebar-balance').innerText = data.balance.toFixed(2);
-                document.getElementById('sidebar-status').innerText = data.status;
-                document.getElementById('sidebar-avatar').innerText = data.avatar || '🧬';
-                document.getElementById('header-avatar').innerText = data.avatar || '🧬';
-
-            } catch (e) { console.error(e); }
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // SOCIAL FEED
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        async function loadSocialFeed() {
-            if (!currentUser) return;
-            try {
-                const res = await fetch('/api/v2/social/posts');
-                const posts = await res.json();
-                const container = document.getElementById('social-feed');
-                container.innerHTML = '';
-                document.getElementById('feed-badge').innerText = posts.length;
-                posts.forEach(p => {
-                    const div = document.createElement('div');
-                    div.className = 'feed-item';
-                    div.innerHTML = `
-                        <div><span class="user">@${p.username}</span> <span class="time">${p.timestamp}</span></div>
-                        <div>${p.content}</div>
-                        <div class="actions">
-                            <span onclick="likePost('${p.id}')">❤️ ${p.likes || 0}</span>
-                            <span onclick="commentPost('${p.id}')">💬 ${p.comments ? p.comments.length : 0}</span>
-                        </div>
-                    `;
-                    container.appendChild(div);
-                });
-            } catch (e) {}
-        }
-
-        async function createSocialPost() {
-            if (!currentUser) return;
-            const input = document.getElementById('social-input');
-            if (!input.value.trim()) return;
-            try {
-                const res = await fetch('/api/v2/social/post', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: currentUser, content: input.value })
-                });
-                if (res.ok) {
-                    input.value = '';
-                    loadSocialFeed();
-                }
-            } catch (e) { alert('Xatolik: ' + e.message); }
-        }
-
-        async function likePost(pid) {
-            if (!currentUser) return;
-            try {
-                await fetch('/api/v2/social/like', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: currentUser, post_id: pid })
-                });
-                loadSocialFeed();
-            } catch (e) {}
-        }
-
-        async function commentPost(pid) {
-            if (!currentUser) return;
-            const comment = prompt('Komment:');
-            if (!comment) return;
-            try {
-                await fetch('/api/v2/social/comment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: currentUser, post_id: pid, comment: comment })
-                });
-                loadSocialFeed();
-            } catch (e) { alert(e.message); }
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // CONSULTATION
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        async function sendConsult() {
-            if (!currentUser) { openAuthModal('signin'); return; }
-            const input = document.getElementById('consult-input');
-            const msg = input.value.trim();
-            if (!msg) return;
-            if (tokenBalance < 3) { alert('Token yetarli emas!'); return; }
-            tokenBalance -= 3;
-            const box = document.getElementById('consult-chat');
-            box.innerHTML += `<div class="chat-msg user">${msg}</div>`;
-            input.value = '';
-            box.scrollTop = box.scrollHeight;
-
-            try {
-                const res = await fetch('/api/v2/ai/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: currentUser, message: msg })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    box.innerHTML += `<div class="chat-msg ai">${data.response}</div>`;
-                    loadProfile();
-                } else {
-                    box.innerHTML += `<div class="chat-msg warning">${data.message}</div>`;
-                }
-            } catch (e) { box.innerHTML += `<div class="chat-msg warning">${e.message}</div>`; }
-            box.scrollTop = box.scrollHeight;
-        }
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                if (document.activeElement?.id === 'consult-input') sendConsult();
-                if (document.activeElement?.id === 'social-input') createSocialPost();
-            }
-        });
-
-        // ─── Camera ───
-        async function startCamera() {
-            if (!currentUser) { openAuthModal('signin'); return; }
-            try {
-                const video = document.getElementById('camera-preview');
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                cameraStream = stream;
-                video.srcObject = stream;
-                video.style.display = 'block';
-                document.getElementById('camera-placeholder').style.display = 'none';
-                cameraActive = true;
-            } catch (err) { alert('Kamera yoqish xatosi: ' + err.message); }
-        }
-
-        function stopCamera() {
-            if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop());
-                cameraStream = null; }
-            document.getElementById('camera-preview').style.display = 'none';
-            document.getElementById('camera-placeholder').style.display = 'block';
-            cameraActive = false;
-        }
-
-        async function captureAndAnalyze() {
-            if (!currentUser) { openAuthModal('signin'); return; }
-            const video = document.getElementById('camera-preview');
-            if (!cameraActive || video.style.display === 'none') { alert('Kamerani yoqing!'); return; }
-            if (tokenBalance < 10) { alert('Token yetarli emas! (10 token)'); return; }
-            tokenBalance -= 10;
-
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            const base64 = canvas.toDataURL('image/jpeg');
-
-            const result = document.getElementById('camera-result');
-            result.innerText = '⏳ Tahlil...';
-            try {
-                const res = await fetch('/api/v2/camera/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: currentUser, department_id: 1, image_data: base64 })
-                });
-                const data = await res.json();
-                if (data.success) { result.innerText = '🔬 ' + data.analysis;
-                    loadProfile(); } else { result.innerText = '❌ ' + data.message; }
-            } catch (e) { result.innerText = '❌ ' + e.message; }
-        }
-
-        // ─── Voice ───
-        function startVoice() {
-            if (!currentUser) { openAuthModal('signin'); return; }
-            if (!('webkitSpeechRecognition' in window)) { alert('Brauzer ovozni qo‘llab-quvvatlamaydi'); return; }
-            if (voiceActive) { stopVoice(); return; }
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognition = new SpeechRecognition();
-            recognition.lang = 'uz-UZ';
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.onstart = () => {
-                voiceActive = true;
-                document.getElementById('voice-status').innerHTML = '<span class="voice-indicator"></span> Aytishni boshlang...';
-            };
-            recognition.onresult = (event) => {
-                let final = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    if (event.results[i].isFinal) final += event.results[i][0].transcript;
-                }
-                if (final) {
-                    document.getElementById('voice-transcript').innerText = final;
-                    document.getElementById('consult-input').value = final;
-                    sendConsult();
-                }
-            };
-            recognition.onerror = (e) => { console.error(e);
-                stopVoice(); };
-            recognition.start();
-        }
-
-        function stopVoice() {
-            if (recognition) { recognition.stop();
-                recognition = null; }
-            voiceActive = false;
-            document.getElementById('voice-status').innerHTML = '';
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // HEALTH RANKING
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        async function loadHealthRanking() {
-            try {
-                const res = await fetch('/api/v2/health/ranking');
-                const data = await res.json();
-                const container = document.getElementById('health-ranking');
-                container.innerHTML = '';
-                data.slice(0, 10).forEach((item, idx) => {
-                    const div = document.createElement('div');
-                    div.className = 'ranking-item';
-                    div.innerHTML = `
-                        <span class="pos">${idx + 1}</span>
-                        <span>${item.avatar || '🧬'}</span>
-                        <span class="name">${item.username}</span>
-                        <span class="score">${item.health_score}%</span>
-                    `;
-                    container.appendChild(div);
-                });
-            } catch (e) {}
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // STATS
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        async function loadStats() {
-            try {
-                const res = await fetch('/api/v2/system/stats');
-                const data = await res.json();
-                const container = document.getElementById('stats-content');
-                container.innerHTML = `
-                    <div class="admin-stat"><div class="value">$${data.total_revenue || 0}</div><div class="label">Daromad</div></div>
-                    <div class="admin-stat"><div class="value" style="color:#43A047;">${data.active_users || 0}</div><div class="label">Aktiv</div></div>
-                    <div class="admin-stat"><div class="value" style="color:#FFB300;">${data.total_sales || 0}</div><div class="label">Sotuv</div></div>
-                    <div class="admin-stat"><div class="value" style="color:#43A047;">${data.total_social_posts || 0}</div><div class="label">Post</div></div>
-                `;
-            } catch (e) {}
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // ADS
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        async function loadAdsPerformance() {
-            try {
-                const res = await fetch('/api/v2/ai/ads-performance');
-                const data = await res.json();
-                const container = document.getElementById('ads-performance');
-                container.innerHTML = '<div class="text-gray-400 text-sm">Hozircha kampaniya yo\'q</div>';
-            } catch (e) {}
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // PACKAGES
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        function renderPackages() {
-            const container = document.getElementById('package-grid');
-            container.innerHTML = `
-                <div class="package-card"><div class="pkg-name">1 Haftalik</div><div class="pkg-price">$999</div></div>
-                <div class="package-card"><div class="pkg-name">1 Oylik</div><div class="pkg-price">$9,999</div></div>
-                <div class="package-card"><div class="pkg-name">3 Oylik</div><div class="pkg-price">$299,999</div></div>
-                <div class="package-card"><div class="pkg-name">1 Yillik</div><div class="pkg-price">$1,199,999</div></div>
-            `;
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // NOTIFICATIONS
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        async function loadNotifications() {
-            if (!currentUser) return;
-            try {
-                const res = await fetch(`/api/v2/notifications/${currentUser}`);
-                const data = await res.json();
-                notifCount = data.filter(n => !n.read).length;
-                document.getElementById('notif-count').innerText = notifCount;
-                const list = document.getElementById('notif-list');
-                list.innerHTML = '';
-                data.slice(0, 10).forEach(n => {
-                    const div = document.createElement('div');
-                    div.className = 'notif-item' + (n.read ? '' : ' unread');
-                    div.innerHTML = `
-                        <span class="time">${new Date(n.timestamp).toLocaleTimeString()}</span>
-                        <div>${n.message}</div>
-                    `;
-                    list.appendChild(div);
-                });
-            } catch (e) {}
-        }
-
-        function toggleNotifications() {
-            const dropdown = document.getElementById('notif-dropdown');
-            dropdown.classList.toggle('show');
-            if (dropdown.classList.contains('show') && notifCount > 0) {
-                fetch(`/api/v2/notifications/read/${currentUser}`, { method: 'POST' });
-                document.getElementById('notif-count').innerText = '0';
-            }
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // ADMIN
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        async function adminLogin() {
-            const user = document.getElementById('admin-user').value.trim();
-            const pass = document.getElementById('admin-pass').value.trim();
-            if (!user || !pass) { alert('Admin ma\'lumotlarini kiriting!'); return; }
-            try {
-                const res = await fetch('/api/v2/admin/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, password: pass })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    document.getElementById('admin-content').classList.remove('hidden');
-                    adminLoadDashboard();
-                } else { alert('Noto\'g\'ri admin ma\'lumotlari'); }
-            } catch (e) { alert(e.message); }
-        }
-
-        async function adminLoadDashboard() {
-            try {
-                const res = await fetch(`/api/v2/admin/dashboard?username=CEO&password=12345678`);
-                const data = await res.json();
-                const grid = document.getElementById('admin-stats-grid');
-                grid.innerHTML = `
-                    <div class="admin-stat"><div class="value">${data.total_users || 0}</div><div class="label">Foydalanuvchilar</div></div>
-                    <div class="admin-stat"><div class="value" style="color:#FFB300;">$${data.total_revenue || 0}</div><div class="label">Daromad</div></div>
-                `;
-                document.getElementById('admin-data').innerHTML = `<pre class="text-xs">${JSON.stringify(data, null, 2)}</pre>`;
-            } catch (e) {}
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // INIT
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        window.onload = function() {
-            document.getElementById('main-app').style.display = 'none';
-            document.querySelectorAll('.lock-overlay').forEach(el => el.style.display = 'flex');
-            openAuthModal('signin');
-        };
-
-        // Close modal on click outside
-        document.getElementById('auth-modal').addEventListener('click', function(e) {
-            if (e.target === this) closeAuthModal();
-        });
-
-        // Enter key in auth inputs
-        document.querySelectorAll('#auth-user, #auth-pass, #auth-email, #auth-curr').forEach(el => {
-            el.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') executeAuth();
-            });
-        });
+        window.onload=function(){document.getElementById('main-app').style.display='none'; document.querySelectorAll('.lock-overlay').forEach(el=>el.style.display='flex'); openAuthModal('signin');};
+        document.getElementById('auth-modal').addEventListener('click',function(e){if(e.target===this)closeAuthModal();});
+        document.querySelectorAll('#auth-user, #auth-pass, #auth-email, #auth-curr').forEach(el=>{el.addEventListener('keydown',function(e){if(e.key==='Enter')executeAuth();});});
     </script>
 </body>
 </html>
