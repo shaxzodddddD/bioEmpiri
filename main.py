@@ -24,7 +24,7 @@ else:
 # ---------- UI ----------
 UI_CONFIG = CONFIG.get("ui", {})
 
-# ---------- API KALITLARI (muhit o‘zgaruvchilaridan yoki config dan) ----------
+# ---------- API KALITLARI ----------
 API_CONFIG = CONFIG.get("api", {})
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", API_CONFIG.get("groq_api_key", ""))
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", API_CONFIG.get("gemini_api_key", ""))
@@ -104,7 +104,6 @@ def load_db():
                 return json.load(f)
         except:
             pass
-    # Default state
     return {
         "users": {},
         "social_posts": [],
@@ -249,7 +248,7 @@ class PurchaseRequest(BaseModel):
     username: str
     package_type: str
 
-# ---------- HTML (fallback) ----------
+# ---------- HTML (fayldan o‘qish, bo‘lmasa fallback) ----------
 def get_html():
     try:
         with open("templates/index.html", "r", encoding="utf-8") as f:
@@ -345,6 +344,7 @@ async def get_profile(username: str):
             raise HTTPException(404, "Foydalanuvchi topilmadi.")
         return db["users"][username]
 
+# ---------- SOCIAL ----------
 @app.get("/api/v2/social/posts")
 async def get_social_posts():
     return db.get("social_posts", [])
@@ -402,6 +402,7 @@ async def comment_post(req: CommentRequest):
                 return {"success": True, "comment": comment_obj}
         raise HTTPException(404, "Post topilmadi.")
 
+# ---------- AI CHAT ----------
 @app.post("/api/v2/ai/chat")
 async def ai_chat(req: AIChatRequest):
     async with db_lock:
@@ -424,6 +425,7 @@ async def ai_chat(req: AIChatRequest):
             ai_response = "🧬 Simptomlaringiz virusli infeksiyaga o'xshaydi. 3 kun dam oling."
         return {"success": True, "response": ai_response, "new_balance": user["balance"], "deducted": chat_price}
 
+# ---------- CAMERA ----------
 @app.post("/api/v2/camera/analyze")
 async def camera_analyze(req: CameraAnalysisRequest):
     async with db_lock:
@@ -453,6 +455,7 @@ async def camera_analyze(req: CameraAnalysisRequest):
                 analysis_result = f"🔬 Xatolik: {e}"
         return {"success": True, "analysis": analysis_result, "new_balance": user["balance"], "deducted": analysis_price}
 
+# ---------- HEALTH RANKING ----------
 @app.get("/api/v2/health/ranking")
 async def health_ranking():
     async with db_lock:
@@ -467,6 +470,7 @@ async def health_ranking():
         ranking.sort(key=lambda x: x["health_score"], reverse=True)
         return ranking
 
+# ---------- STATS ----------
 @app.get("/api/v2/system/stats")
 async def system_stats():
     return {
@@ -476,10 +480,12 @@ async def system_stats():
         "total_social_posts": len(db.get("social_posts", []))
     }
 
+# ---------- ADS ----------
 @app.get("/api/v2/ai/ads-performance")
 async def ads_performance():
     return db.get("ads_performance", {})
 
+# ---------- NOTIFICATIONS ----------
 @app.get("/api/v2/notifications/{username}")
 async def get_notifications(username: str):
     async with db_lock:
@@ -498,6 +504,7 @@ async def mark_notifications_read(username: str):
         save_db(db)
         return {"success": True}
 
+# ---------- PACKAGE PURCHASE ----------
 @app.post("/api/v2/clinical/purchase")
 async def purchase_package(req: PurchaseRequest):
     async with db_lock:
@@ -524,6 +531,7 @@ async def purchase_package(req: PurchaseRequest):
         save_db(db)
         return {"success": True, "message": f"{pkg['desc']}", "new_balance": user["balance"]}
 
+# ---------- ADMIN ----------
 @app.post("/api/v2/admin/login")
 async def admin_login(request: Request):
     data = await request.json()
@@ -544,12 +552,10 @@ async def admin_dashboard(username: str = None, password: str = None):
         "total_sales": len(db.get("product_sales", []))
     }
 
+# ---------- LEGAL ----------
 @app.get("/api/v2/legal")
 async def get_legal():
     return LEGAL
-
-# ---------- AVTONOM AI TASKS (qisqa) ----------
-# ... (ixtiyoriy, ammo AI_AUTONOMY ga asoslangan holda ishlaydi)
 
 # ============================================================
 # SERVER
