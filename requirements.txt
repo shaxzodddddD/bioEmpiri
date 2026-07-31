@@ -1,6 +1,9 @@
 fastapi
 uvicorn[standard]
-pydantic
+sqlalchemy
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+jinja2
 httpx
 google-generativeai
-python-multipart
