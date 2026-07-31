@@ -1,16 +1,29 @@
 import os
 import json
 import random
+import asyncio
 import hashlib
 import base64
+import httpx
 from datetime import datetime
 from typing import Optional, List
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-import httpx
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
 import uvicorn
+
+# ---------- KONFIGURATSIYA ----------
+SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # ---------- PAPKALAR VA TEMPLATES ----------
 if not os.path.exists("templates"):
@@ -223,87 +236,68 @@ if not os.path.exists(INDEX_HTML_PATH):
 </body>
 </html>""")
 
-# ---------- APP ----------
-app = FastAPI(title="BioEmpire V13")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+templates = Jinja2Templates(directory="templates")
 
-# ---------- DATABASE JSON ----------
-DB_FILE = "database_log.json"
+# ---------- DATABASE ----------
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./database.db")
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
-def load_db():
-    if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            pass
-    return {
-        "users": {},
-        "social_posts": [],
-        "system_vault": {"total_revenue": 0, "active_users": 0},
-        "notifications": [],
-        "user_activity": {},
-        "product_sales": [],
-        "ads_performance": {},
-        "feed": []
-    }
+# ---------- JWT ----------
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
 
-def save_db(data):
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    token = credentials.credentials
     try:
-        with open(DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-        return True
-    except Exception as e:
-        print(f"[DB] xato: {e}")
-        return False
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        user = db.query(User).filter(User.username == username).first()
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
-db = load_db()
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-def hash_password(p: str) -> str:
-    return hashlib.sha256(p.encode()).hexdigest()
+# ---------- SQLALCHEMY MODELS ----------
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    currency = Column(String, default="USD")
+    balance = Column(Float, default=25000.0)
+    status = Column(String, default="WARNING")
+    department = Column(String, default="None")
+    health_score = Column(Float, default=85.0)
+    avatar = Column(String, default="🧬")
+    bio = Column(String, default="BioEmpire tizimiga yangi qo'shildim")
+    registered_at = Column(DateTime, default=datetime.utcnow)
 
-def generate_post_id():
-    return f"post_{random.randint(10000, 99999)}_{int(datetime.now().timestamp())}"
-
-def generate_notification(username: str, message: str, type: str = "info") -> dict:
-    return {
-        "id": generate_post_id(),
-        "username": username,
-        "message": message,
-        "type": type,
-        "timestamp": datetime.now().isoformat(),
-        "read": False
-    }
-
-def add_notification(notification: dict):
-    db["notifications"].insert(0, notification)
-    if len(db["notifications"]) > 100:
-        db["notifications"] = db["notifications"][:100]
-    save_db(db)
-
-def track_user_activity(username: str, action: str, details: dict = None):
-    if username not in db["user_activity"]:
-        db["user_activity"][username] = {
-            "last_active": datetime.now().isoformat(),
-            "actions": [],
-            "total_spent": 0.0,
-            "packages_bought": 0
-        }
-    db["user_activity"][username]["last_active"] = datetime.now().isoformat()
-    db["user_activity"][username]["actions"].append({
-        "action": action,
-        "timestamp": datetime.now().isoformat(),
-        "details": details or {}
-    })
-    if len(db["user_activity"][username]["actions"]) > 100:
-        db["user_activity"][username]["actions"] = db["user_activity"][username]["actions"][-100:]
-    save_db(db)
+Base.metadata.create_all(bind=engine)
 
 # ---------- PYDANTIC ----------
 class UserRegister(BaseModel):
@@ -315,6 +309,10 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
 class SocialPostRequest(BaseModel):
     username: str
@@ -342,7 +340,85 @@ class PurchaseRequest(BaseModel):
     username: str
     package_type: str
 
-# ---------- AI FUNCTIONS ----------
+# ---------- APP ----------
+app = FastAPI(title="BioEmpire V13")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ---------- JSON DB ----------
+DB_FILE = "database_log.json"
+
+def load_db():
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {
+        "social_posts": [],
+        "system_vault": {"total_revenue": 0, "active_users": 0},
+        "notifications": [],
+        "user_activity": {},
+        "product_sales": [],
+        "ads_performance": {},
+        "feed": []
+    }
+
+def save_db(data):
+    try:
+        with open(DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"[DB] xato: {e}")
+        return False
+
+db_json = load_db()
+
+def generate_post_id():
+    return f"post_{random.randint(10000, 99999)}_{int(datetime.now().timestamp())}"
+
+def generate_notification(username: str, message: str, type: str = "info") -> dict:
+    return {
+        "id": generate_post_id(),
+        "username": username,
+        "message": message,
+        "type": type,
+        "timestamp": datetime.now().isoformat(),
+        "read": False
+    }
+
+def add_notification(notification: dict):
+    db_json["notifications"].insert(0, notification)
+    if len(db_json["notifications"]) > 100:
+        db_json["notifications"] = db_json["notifications"][:100]
+    save_db(db_json)
+
+def track_user_activity(username: str, action: str, details: dict = None):
+    if username not in db_json["user_activity"]:
+        db_json["user_activity"][username] = {
+            "last_active": datetime.now().isoformat(),
+            "actions": [],
+            "total_spent": 0.0,
+            "packages_bought": 0
+        }
+    db_json["user_activity"][username]["last_active"] = datetime.now().isoformat()
+    db_json["user_activity"][username]["actions"].append({
+        "action": action,
+        "timestamp": datetime.now().isoformat(),
+        "details": details or {}
+    })
+    if len(db_json["user_activity"][username]["actions"]) > 100:
+        db_json["user_activity"][username]["actions"] = db_json["user_activity"][username]["actions"][-100:]
+    save_db(db_json)
+
+# ---------- AI ----------
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-1.5-flash"
@@ -399,82 +475,62 @@ async def call_ai_api(messages: List[dict]) -> Optional[str]:
 # ---------- ROUTERS ----------
 @app.get("/", response_class=HTMLResponse)
 @app.head("/", response_class=HTMLResponse)
-async def root():
-    try:
-        with open("templates/index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    except:
-        return "<h1>templates/index.html topilmadi</h1>"
+async def root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/index.html", response_class=HTMLResponse)
 @app.head("/index.html", response_class=HTMLResponse)
-async def index():
-    try:
-        with open("templates/index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    except:
-        return "<h1>templates/index.html topilmadi</h1>"
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
-# ---------- AUTH ----------
-@app.post("/api/v2/auth/signup")
-async def signup(user: UserRegister):
-    if user.username in db["users"]:
-        raise HTTPException(400, "Bu username allaqachon band.")
-    for u in db["users"].values():
-        if u.get("email") == user.email:
-            raise HTTPException(400, "Bu email allaqachon ro'yxatdan o'tgan.")
-    curr = user.currency.upper()
-    rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
-    if curr not in rates:
-        curr = "USD"
-    initial_balance = 25000.0 * rates.get(curr, 1.0)
-    db["users"][user.username] = {
-        "email": user.email,
-        "password_hash": hash_password(user.password),
-        "currency": curr,
-        "balance": initial_balance,
-        "status": "WARNING",
-        "department": "None",
-        "health_score": 85.0,
-        "avatar": "🧬",
-        "bio": "BioEmpire tizimiga yangi qo'shildim",
-        "registered_at": datetime.now().isoformat(),
-        "packages": []
-    }
-    db["system_vault"]["active_users"] = len(db["users"])
-    save_db(db)
-    add_notification(generate_notification(user.username, "🎉 Xush kelibsiz!"))
-    return {"status": "success", "username": user.username, "balance": initial_balance, "currency": curr}
+# AUTH
+@app.post("/api/v2/auth/signup", response_model=Token)
+async def signup(user: UserRegister, db: Session = Depends(get_db)):
+    existing = db.query(User).filter((User.username == user.username) | (User.email == user.email)).first()
+    if existing:
+        raise HTTPException(400, "Username yoki email allaqachon band.")
+    hashed = get_password_hash(user.password)
+    new_user = User(
+        username=user.username,
+        email=user.email,
+        hashed_password=hashed,
+        currency=user.currency
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    access_token = create_access_token({"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/api/v2/auth/signin")
-async def signin(user: UserLogin):
-    if user.username not in db["users"]:
-        raise HTTPException(400, "Noto'g'ri username yoki parol.")
-    target = db["users"][user.username]
-    if target["password_hash"] != hash_password(user.password):
-        raise HTTPException(400, "Noto'g'ri username yoki parol.")
-    track_user_activity(user.username, "signin")
-    return {
-        "status": "success",
-        "username": user.username,
-        "balance": target["balance"],
-        "currency": target["currency"],
-        "status_layer": target["status"],
-        "department": target["department"],
-        "health_score": target["health_score"],
-        "avatar": target.get("avatar", "🧬"),
-        "bio": target.get("bio", "")
-    }
+@app.post("/api/v2/auth/signin", response_model=Token)
+async def signin(user: UserLogin, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.username == user.username).first()
+    if not db_user or not verify_password(user.password, db_user.hashed_password):
+        raise HTTPException(401, "Noto'g'ri username yoki parol.")
+    access_token = create_access_token({"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/api/v2/profile/{username}")
-async def get_profile(username: str):
-    if username not in db["users"]:
-        raise HTTPException(404, "Foydalanuvchi topilmadi.")
-    return db["users"][username]
+async def get_profile(username: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.username != username:
+        raise HTTPException(403, "Faqat o'z profilingizni ko'ra olasiz.")
+    return {
+        "username": current_user.username,
+        "email": current_user.email,
+        "balance": current_user.balance,
+        "currency": current_user.currency,
+        "status": current_user.status,
+        "department": current_user.department,
+        "health_score": current_user.health_score,
+        "avatar": current_user.avatar,
+        "bio": current_user.bio,
+        "registered_at": current_user.registered_at.isoformat()
+    }
 
+# SOCIAL
 @app.get("/api/v2/social/posts")
 async def get_social_posts():
-    return db.get("social_posts", [])
+    return db_json.get("social_posts", [])
 
 @app.post("/api/v2/social/post")
 async def create_social_post(req: SocialPostRequest):
@@ -488,10 +544,10 @@ async def create_social_post(req: SocialPostRequest):
         "likes": 0,
         "comments": []
     }
-    db["social_posts"].insert(0, post)
-    if len(db["social_posts"]) > 100:
-        db["social_posts"] = db["social_posts"][:100]
-    save_db(db)
+    db_json["social_posts"].insert(0, post)
+    if len(db_json["social_posts"]) > 100:
+        db_json["social_posts"] = db_json["social_posts"][:100]
+    save_db(db_json)
     track_user_activity(req.username, "social_post", {"content": req.content[:50]})
     return post
 
@@ -499,10 +555,10 @@ async def create_social_post(req: SocialPostRequest):
 async def like_post(req: LikeRequest):
     if req.username not in db["users"]:
         raise HTTPException(404, "Foydalanuvchi topilmadi.")
-    for post in db["social_posts"]:
+    for post in db_json["social_posts"]:
         if post["id"] == req.post_id:
             post["likes"] = post.get("likes", 0) + 1
-            save_db(db)
+            save_db(db_json)
             track_user_activity(req.username, "like", {"post_id": req.post_id})
             return {"success": True, "likes": post["likes"]}
     raise HTTPException(404, "Post topilmadi.")
@@ -511,7 +567,7 @@ async def like_post(req: LikeRequest):
 async def comment_post(req: CommentRequest):
     if req.username not in db["users"]:
         raise HTTPException(404, "Foydalanuvchi topilmadi.")
-    for post in db["social_posts"]:
+    for post in db_json["social_posts"]:
         if post["id"] == req.post_id:
             comment_obj = {
                 "username": req.username,
@@ -521,11 +577,12 @@ async def comment_post(req: CommentRequest):
             if "comments" not in post:
                 post["comments"] = []
             post["comments"].append(comment_obj)
-            save_db(db)
+            save_db(db_json)
             track_user_activity(req.username, "comment", {"post_id": req.post_id})
             return {"success": True, "comment": comment_obj}
     raise HTTPException(404, "Post topilmadi.")
 
+# AI CHAT
 @app.post("/api/v2/ai/chat")
 async def ai_chat(req: AIChatRequest):
     if req.username not in db["users"]:
@@ -549,6 +606,7 @@ async def ai_chat(req: AIChatRequest):
         ai_response = "🧬 Simptomlaringiz virusli infeksiyaga o'xshaydi. 3 kun dam oling."
     return {"success": True, "response": ai_response, "new_balance": user["balance"], "deducted": price}
 
+# CAMERA
 @app.post("/api/v2/camera/analyze")
 async def camera_analyze(req: CameraAnalysisRequest):
     if req.username not in db["users"]:
@@ -579,19 +637,13 @@ async def camera_analyze(req: CameraAnalysisRequest):
             analysis_result = f"🔬 Xatolik: {e}"
     return {"success": True, "analysis": analysis_result, "new_balance": user["balance"], "deducted": price}
 
+# HEALTH RANKING
 @app.get("/api/v2/health/ranking")
-async def health_ranking():
-    ranking = []
-    for username, user in db["users"].items():
-        ranking.append({
-            "username": username,
-            "health_score": user.get("health_score", 0),
-            "status": user.get("status", "WARNING"),
-            "avatar": user.get("avatar", "🧬")
-        })
-    ranking.sort(key=lambda x: x["health_score"], reverse=True)
-    return ranking
+async def health_ranking(db: Session = Depends(get_db)):
+    users = db.query(User).order_by(User.health_score.desc()).all()
+    return [{"username": u.username, "health_score": u.health_score, "status": u.status, "avatar": u.avatar} for u in users]
 
+# STATS
 @app.get("/api/v2/system/stats")
 async def system_stats():
     return {
@@ -601,10 +653,12 @@ async def system_stats():
         "total_social_posts": len(db.get("social_posts", []))
     }
 
+# ADS
 @app.get("/api/v2/ai/ads-performance")
 async def ads_performance():
     return db.get("ads_performance", {})
 
+# NOTIFICATIONS
 @app.get("/api/v2/notifications/{username}")
 async def get_notifications(username: str):
     if username not in db["users"]:
@@ -621,6 +675,7 @@ async def mark_notifications_read(username: str):
     save_db(db)
     return {"success": True}
 
+# PACKAGES
 PACKAGES = {
     "1_week": {"price_usd": 999, "status": "MONITORING", "desc": "1 haftalik asosiy davo"},
     "1_month": {"price_usd": 9999, "status": "OPTIMIZED", "desc": "1 oylik kengaytirilgan davo"},
@@ -661,21 +716,22 @@ async def purchase_package(req: PurchaseRequest):
     save_db(db)
     return {"success": True, "message": pkg["desc"], "new_balance": user["balance"]}
 
+# ADMIN
 ADMIN_USERNAME = "CEO"
-ADMIN_PASSWORD_HASH = hash_password("12345678")
+ADMIN_PASSWORD_HASH = hashlib.sha256("12345678".encode()).hexdigest()
 
 @app.post("/api/v2/admin/login")
 async def admin_login(request: Request):
     data = await request.json()
     username = data.get("username")
     password = data.get("password")
-    if username == ADMIN_USERNAME and hash_password(password) == ADMIN_PASSWORD_HASH:
+    if username == ADMIN_USERNAME and hashlib.sha256(password.encode()).hexdigest() == ADMIN_PASSWORD_HASH:
         return {"success": True, "token": "admin-token"}
     raise HTTPException(401, "Noto'g'ri")
 
 @app.get("/api/v2/admin/dashboard")
 async def admin_dashboard(username: str = None, password: str = None):
-    if username != ADMIN_USERNAME or hash_password(password or "") != ADMIN_PASSWORD_HASH:
+    if username != ADMIN_USERNAME or hashlib.sha256(password.encode()).hexdigest() != ADMIN_PASSWORD_HASH:
         raise HTTPException(401, "Avtorizatsiya kerak")
     return {
         "total_users": len(db["users"]),
