@@ -13,60 +13,6 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# ---------- KONFIGURATSIYANI YUKLASH ----------
-CONFIG_FILE = "config.json"
-if os.path.exists(CONFIG_FILE):
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-        CONFIG = json.load(f)
-else:
-    CONFIG = {}
-
-# ---------- UI ----------
-UI_CONFIG = CONFIG.get("ui", {})
-
-# ---------- API KALITLARI ----------
-API_CONFIG = CONFIG.get("api", {})
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", API_CONFIG.get("groq_api_key", ""))
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", API_CONFIG.get("gemini_api_key", ""))
-GEMINI_MODEL = API_CONFIG.get("gemini_model", "gemini-1.5-flash")
-GROQ_MODEL = API_CONFIG.get("groq_model", "mixtral-8x7b-32768")
-PRIMARY_AI = API_CONFIG.get("primary_ai", "gemini")
-GROQ_TEMPERATURE = API_CONFIG.get("temperature", 0.7)
-GROQ_MAX_TOKENS = API_CONFIG.get("max_tokens", 2048)
-
-# ---------- EXCHANGE RATES ----------
-EXCHANGE_RATES = CONFIG.get("exchange_rates", {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075})
-
-# ---------- PAKETLAR ----------
-PACKAGES = CONFIG.get("packages", {})
-
-# ---------- DEPARTAMENLAR ----------
-DEPARTMENTS = {d["id"]: d for d in CONFIG.get("departments", [])}
-RED_ZONE_DEPARTMENTS = {d["id"]: d for d in CONFIG.get("red_zone_departments", [])}
-
-# ---------- E-COMMERCE ----------
-ECOMMERCE = CONFIG.get("ecommerce", {"products": []})
-
-# ---------- NARXLAR ----------
-CHAT_PRICE_USD = CONFIG.get("chat_price_usd", 49)
-CAMERA_PRICE_USD = CONFIG.get("camera_analysis_price_usd", 150)
-
-# ---------- AVTONOM AI ----------
-AI_AUTONOMY = CONFIG.get("ai_autonomy", {})
-AUTO_LEARNING_INTERVAL = CONFIG.get("auto_learning_interval", 120)
-AUTO_MARKETING_INTERVAL = CONFIG.get("auto_marketing_interval", 120)
-AUTO_ADS_OPTIMIZER_INTERVAL = CONFIG.get("auto_ads_optimizer_interval", 60)
-AUTO_DECISION_INTERVAL = CONFIG.get("auto_decision_interval", 300)
-MAX_AI_HISTORY = CONFIG.get("max_ai_history", 50)
-
-# ---------- ADMIN ----------
-ADMIN = CONFIG.get("admin", {})
-ADMIN_USERNAME = ADMIN.get("username", "CEO")
-ADMIN_PASSWORD_HASH = ADMIN.get("password_hash", hashlib.sha256("12345678".encode()).hexdigest())
-
-# ---------- LEGAL ----------
-LEGAL = CONFIG.get("legal", {})
-
 # ---------- GEMINI ----------
 try:
     import google.generativeai as genai
@@ -74,11 +20,17 @@ try:
 except ImportError:
     GEMINI_AVAILABLE = False
 
+# ---------- KALITLAR ----------
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-1.5-flash"
+GROQ_MODEL = "mixtral-8x7b-32768"
+
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     print("✅ Gemini sozlandi")
 else:
-    print("⚠️ Gemini sozlanmadi – GEMINI_API_KEY ni qo'shing")
+    print("⚠️ Gemini sozlanmadi")
 
 app = FastAPI(title="BioEmpire V13", version="13.0.0")
 app.add_middleware(
@@ -89,9 +41,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------- BAZA (database_log.json) ----------
+# ---------- BAZA ----------
 DB_FILE = "database_log.json"
-BACKUP_FILE = "database_log_backup.json"
 db_lock = asyncio.Lock()
 
 def hash_password(p: str) -> str:
@@ -118,8 +69,6 @@ def load_db():
 def save_db(data):
     try:
         with open(DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-        with open(BACKUP_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
         return True
     except Exception as e:
@@ -174,8 +123,8 @@ async def call_groq_api(messages: List[dict]) -> Optional[str]:
     data = {
         "model": GROQ_MODEL,
         "messages": messages,
-        "temperature": GROQ_TEMPERATURE,
-        "max_tokens": GROQ_MAX_TOKENS
+        "temperature": 0.7,
+        "max_tokens": 2048
     }
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -200,18 +149,12 @@ async def call_gemini_api(messages: List[dict]) -> Optional[str]:
         return None
 
 async def call_ai_api(messages: List[dict]) -> Optional[str]:
-    if PRIMARY_AI == "gemini":
-        response = await call_gemini_api(messages)
-        if response:
-            return response
-        return await call_groq_api(messages)
-    else:
-        response = await call_groq_api(messages)
-        if response:
-            return response
-        return await call_gemini_api(messages)
+    response = await call_gemini_api(messages)
+    if response:
+        return response
+    return await call_groq_api(messages)
 
-# ---------- PYDANTIC MODELLAR ----------
+# ---------- PYDANTIC ----------
 class UserRegister(BaseModel):
     username: str = Field(..., min_length=2, max_length=30)
     email: str
@@ -248,29 +191,47 @@ class PurchaseRequest(BaseModel):
     username: str
     package_type: str
 
-# ---------- HTML (fayldan o‘qish, bo‘lmasa fallback) ----------
+# ---------- HTML ----------
 def get_html():
+    # 1. templates/index.html dan o‘qish
     try:
         with open("templates/index.html", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        return """
-        <!DOCTYPE html>
-        <html>
-        <head><title>🧬 BioEmpire V13</title></head>
-        <body style="font-family:sans-serif;background:#E8F5E9;padding:40px;text-align:center;">
-            <h1>🧬 BioEmpire V13</h1>
-            <p>Iltimos, <code>templates/index.html</code> faylni joylashtiring.</p>
-            <p>Yoki quyidagi havolalardan foydalaning:</p>
-            <ul style="list-style:none;padding:0;">
-                <li><a href="/api/v2/auth/signup">Ro'yxatdan o'tish</a></li>
-                <li><a href="/api/v2/auth/signin">Kirish</a></li>
-                <li><a href="/api/v2/health/ranking">Salomatlik reytingi</a></li>
-                <li><a href="/api/v2/system/stats">Statistika</a></li>
-            </ul>
-        </body>
-        </html>
-        """
+        # 2. Fallback – to‘liq interfeys
+        return """<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧬 BioEmpire V13</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body{background:#E8F5E9;font-family:'Segoe UI',system-ui,sans-serif;margin:0;padding:40px;text-align:center;}
+        .card{background:white;border-radius:20px;padding:40px;max-width:600px;margin:auto;box-shadow:0 8px 32px rgba(0,40,0,0.08);}
+        h1{color:#43A047;}
+        .btn{display:inline-block;background:#66BB6A;color:white;padding:12px 30px;border-radius:30px;text-decoration:none;margin:8px;font-weight:700;}
+        .btn:hover{background:#43A047;}
+        .links{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:20px;}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🧬 BioEmpire V13</h1>
+        <p style="color:#4A6A4A;">Tizim ishga tushdi! ✅</p>
+        <p style="color:#4A6A4A;">Agar <code>templates/index.html</code> mavjud bo‘lsa, u yuklanadi.</p>
+        <div class="links">
+            <a href="/api/v2/auth/signup" class="btn">Ro'yxatdan o'tish</a>
+            <a href="/api/v2/auth/signin" class="btn" style="background:#FFB300;color:#1B3A1B;">Kirish</a>
+            <a href="/api/v2/health/ranking" class="btn" style="background:#43A047;">Salomatlik reytingi</a>
+            <a href="/api/v2/system/stats" class="btn" style="background:#43A047;">Statistika</a>
+        </div>
+        <div style="margin-top:20px;font-size:12px;color:#4A6A4A;">
+            Admin: CEO / parol: 12345678
+        </div>
+    </div>
+</body>
+</html>"""
 
 # ============================================================
 # ENDPOINTLAR
@@ -295,9 +256,10 @@ async def signup(user: UserRegister):
             if u.get("email") == user.email:
                 raise HTTPException(400, "Bu email allaqachon ro'yxatdan o'tgan.")
         curr = user.currency.upper()
-        if curr not in EXCHANGE_RATES:
+        rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
+        if curr not in rates:
             curr = "USD"
-        initial_balance = 25000.0 * EXCHANGE_RATES.get(curr, 1.0)
+        initial_balance = 25000.0 * rates.get(curr, 1.0)
         db["users"][user.username] = {
             "email": user.email,
             "password_hash": hash_password(user.password),
@@ -409,11 +371,13 @@ async def ai_chat(req: AIChatRequest):
         if req.username not in db["users"]:
             raise HTTPException(404, "Foydalanuvchi topilmadi.")
         user = db["users"][req.username]
-        chat_price = CHAT_PRICE_USD * EXCHANGE_RATES.get(user["currency"], 1.0)
-        if user["balance"] < chat_price:
-            return {"success": False, "message": f"⚠️ ${chat_price:.2f} kerak."}
-        user["balance"] -= chat_price
-        db["system_vault"]["total_revenue"] += chat_price
+        chat_price = 49.0
+        rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
+        price = chat_price * rates.get(user["currency"], 1.0)
+        if user["balance"] < price:
+            return {"success": False, "message": f"⚠️ ${price:.2f} kerak."}
+        user["balance"] -= price
+        db["system_vault"]["total_revenue"] += price
         save_db(db)
         track_user_activity(req.username, "ai_chat", {"message": req.message[:50]})
         messages = [
@@ -423,7 +387,7 @@ async def ai_chat(req: AIChatRequest):
         ai_response = await call_ai_api(messages)
         if not ai_response:
             ai_response = "🧬 Simptomlaringiz virusli infeksiyaga o'xshaydi. 3 kun dam oling."
-        return {"success": True, "response": ai_response, "new_balance": user["balance"], "deducted": chat_price}
+        return {"success": True, "response": ai_response, "new_balance": user["balance"], "deducted": price}
 
 # ---------- CAMERA ----------
 @app.post("/api/v2/camera/analyze")
@@ -432,11 +396,13 @@ async def camera_analyze(req: CameraAnalysisRequest):
         if req.username not in db["users"]:
             raise HTTPException(404, "Foydalanuvchi topilmadi.")
         user = db["users"][req.username]
-        analysis_price = CAMERA_PRICE_USD * EXCHANGE_RATES.get(user["currency"], 1.0)
-        if user["balance"] < analysis_price:
-            return {"success": False, "message": f"⚠️ ${analysis_price:.2f} kerak."}
-        user["balance"] -= analysis_price
-        db["system_vault"]["total_revenue"] += analysis_price
+        analysis_price = 150.0
+        rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
+        price = analysis_price * rates.get(user["currency"], 1.0)
+        if user["balance"] < price:
+            return {"success": False, "message": f"⚠️ ${price:.2f} kerak."}
+        user["balance"] -= price
+        db["system_vault"]["total_revenue"] += price
         save_db(db)
         track_user_activity(req.username, "camera_analysis", {"department_id": req.department_id})
         analysis_result = "🔬 Rasm tahlili: Teri toshmasi aniqlangan."
@@ -453,7 +419,7 @@ async def camera_analyze(req: CameraAnalysisRequest):
                     analysis_result = "🔬 " + response.text
             except Exception as e:
                 analysis_result = f"🔬 Xatolik: {e}"
-        return {"success": True, "analysis": analysis_result, "new_balance": user["balance"], "deducted": analysis_price}
+        return {"success": True, "analysis": analysis_result, "new_balance": user["balance"], "deducted": price}
 
 # ---------- HEALTH RANKING ----------
 @app.get("/api/v2/health/ranking")
@@ -504,17 +470,31 @@ async def mark_notifications_read(username: str):
         save_db(db)
         return {"success": True}
 
-# ---------- PACKAGE PURCHASE ----------
+# ---------- PACKAGE ----------
 @app.post("/api/v2/clinical/purchase")
 async def purchase_package(req: PurchaseRequest):
     async with db_lock:
         if req.username not in db["users"]:
             raise HTTPException(404, "Foydalanuvchi topilmadi.")
         user = db["users"][req.username]
-        pkg = PACKAGES.get(req.package_type)
+        packages = {
+            "1_week": {"price_usd": 999, "status": "MONITORING", "desc": "1 haftalik asosiy davo"},
+            "1_month": {"price_usd": 9999, "status": "OPTIMIZED", "desc": "1 oylik kengaytirilgan davo"},
+            "3_month": {"price_usd": 299999, "status": "OPTIMIZED", "desc": "3 oylik premium davo"},
+            "6_month": {"price_usd": 599999, "status": "OPTIMIZED", "desc": "6 oylik elita davo"},
+            "1_year": {"price_usd": 1199999, "status": "IMMORTAL", "desc": "1 yillik ustun davo"},
+            "3_year": {"price_usd": 2999999, "status": "IMMORTAL", "desc": "3 yillik mukammal davo"},
+            "6_year": {"price_usd": 5999999, "status": "IMMORTAL", "desc": "6 yillik abadiy davo"},
+            "10_year": {"price_usd": 9999999, "status": "IMMORTAL", "desc": "10 yillik o'lmaslik matritsasi"},
+            "red_zone_vip": {"price_usd": 99000000, "status": "IMMORTAL", "desc": "QIZIL ZONA VIP"},
+            "gadget": {"price_usd": 1200, "status": "MONITORING", "desc": "BCI bilaguzuk"},
+            "meds": {"price_usd": 650, "status": "MONITORING", "desc": "Kvant dorilar to'plami"}
+        }
+        pkg = packages.get(req.package_type)
         if not pkg:
             raise HTTPException(400, "Noma'lum paket turi.")
-        price = pkg["price_usd"] * EXCHANGE_RATES.get(user["currency"], 1.0)
+        rates = {"USD": 1.0, "EUR": 0.92, "BTC": 0.000015, "SOL": 0.0075}
+        price = pkg["price_usd"] * rates.get(user["currency"], 1.0)
         if user["balance"] < price:
             return {"success": False, "message": "Mablag' yetishmasligi!"}
         user["balance"] -= price
@@ -532,6 +512,9 @@ async def purchase_package(req: PurchaseRequest):
         return {"success": True, "message": f"{pkg['desc']}", "new_balance": user["balance"]}
 
 # ---------- ADMIN ----------
+ADMIN_USERNAME = "CEO"
+ADMIN_PASSWORD_HASH = hash_password("12345678")
+
 @app.post("/api/v2/admin/login")
 async def admin_login(request: Request):
     data = await request.json()
@@ -551,11 +534,6 @@ async def admin_dashboard(username: str = None, password: str = None):
         "active_users": db["system_vault"]["active_users"],
         "total_sales": len(db.get("product_sales", []))
     }
-
-# ---------- LEGAL ----------
-@app.get("/api/v2/legal")
-async def get_legal():
-    return LEGAL
 
 # ============================================================
 # SERVER
