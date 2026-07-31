@@ -20,7 +20,7 @@ try:
 except ImportError:
     GEMINI_AVAILABLE = False
 
-# ---------- KALITLAR ----------
+# ---------- KALITLAR (muhit o'zgaruvchilaridan) ----------
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-1.5-flash"
@@ -30,7 +30,7 @@ if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     print("✅ Gemini sozlandi")
 else:
-    print("⚠️ Gemini sozlanmadi")
+    print("⚠️ Gemini sozlanmadi – GEMINI_API_KEY ni qo'shing")
 
 app = FastAPI(title="BioEmpire V13", version="13.0.0")
 app.add_middleware(
@@ -41,7 +41,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------- BAZA ----------
+# ---------- BAZA (database_log.json) ----------
 DB_FILE = "database_log.json"
 db_lock = asyncio.Lock()
 
@@ -154,7 +154,7 @@ async def call_ai_api(messages: List[dict]) -> Optional[str]:
         return response
     return await call_groq_api(messages)
 
-# ---------- PYDANTIC ----------
+# ---------- PYDANTIC MODELLAR ----------
 class UserRegister(BaseModel):
     username: str = Field(..., min_length=2, max_length=30)
     email: str
@@ -191,45 +191,40 @@ class PurchaseRequest(BaseModel):
     username: str
     package_type: str
 
-# ---------- HTML ----------
+# ---------- HTML (fallback) ----------
 def get_html():
-    # 1. templates/index.html dan o‘qish
+    # 1. templates/index.html dan o'qish
     try:
         with open("templates/index.html", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        # 2. Fallback – to‘liq interfeys
+        # 2. Fallback – to'liq interfeys
         return """<!DOCTYPE html>
 <html lang="uz">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧬 BioEmpire V13</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body{background:#E8F5E9;font-family:'Segoe UI',system-ui,sans-serif;margin:0;padding:40px;text-align:center;}
-        .card{background:white;border-radius:20px;padding:40px;max-width:600px;margin:auto;box-shadow:0 8px 32px rgba(0,40,0,0.08);}
-        h1{color:#43A047;}
-        .btn{display:inline-block;background:#66BB6A;color:white;padding:12px 30px;border-radius:30px;text-decoration:none;margin:8px;font-weight:700;}
-        .btn:hover{background:#43A047;}
-        .links{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:20px;}
-    </style>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>🧬 BioEmpire V13</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{background:#E8F5E9;font-family:'Segoe UI',system-ui,sans-serif;margin:0;padding:40px;text-align:center;}
+.card{background:white;border-radius:20px;padding:40px;max-width:600px;margin:auto;box-shadow:0 8px 32px rgba(0,40,0,0.08);}
+h1{color:#43A047;}
+.btn{display:inline-block;background:#66BB6A;color:white;padding:12px 30px;border-radius:30px;text-decoration:none;margin:8px;font-weight:700;}
+.btn:hover{background:#43A047;}
+.links{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:20px;}
+</style>
 </head>
 <body>
-    <div class="card">
-        <h1>🧬 BioEmpire V13</h1>
-        <p style="color:#4A6A4A;">Tizim ishga tushdi! ✅</p>
-        <p style="color:#4A6A4A;">Agar <code>templates/index.html</code> mavjud bo‘lsa, u yuklanadi.</p>
-        <div class="links">
-            <a href="/api/v2/auth/signup" class="btn">Ro'yxatdan o'tish</a>
-            <a href="/api/v2/auth/signin" class="btn" style="background:#FFB300;color:#1B3A1B;">Kirish</a>
-            <a href="/api/v2/health/ranking" class="btn" style="background:#43A047;">Salomatlik reytingi</a>
-            <a href="/api/v2/system/stats" class="btn" style="background:#43A047;">Statistika</a>
-        </div>
-        <div style="margin-top:20px;font-size:12px;color:#4A6A4A;">
-            Admin: CEO / parol: 12345678
-        </div>
-    </div>
+<div class="card">
+<h1>🧬 BioEmpire V13</h1>
+<p style="color:#4A6A4A;">Tizim ishga tushdi! ✅</p>
+<p style="color:#4A6A4A;">Agar <code>templates/index.html</code> mavjud bo'lsa, u yuklanadi.</p>
+<div class="links">
+<a href="/api/v2/auth/signup" class="btn">Ro'yxatdan o'tish</a>
+<a href="/api/v2/auth/signin" class="btn" style="background:#FFB300;color:#1B3A1B;">Kirish</a>
+<a href="/api/v2/health/ranking" class="btn" style="background:#43A047;">Salomatlik reytingi</a>
+<a href="/api/v2/system/stats" class="btn" style="background:#43A047;">Statistika</a>
+</div>
+<div style="margin-top:20px;font-size:12px;color:#4A6A4A;">Admin: CEO / parol: 12345678</div>
+</div>
 </body>
 </html>"""
 
@@ -533,6 +528,20 @@ async def admin_dashboard(username: str = None, password: str = None):
         "total_revenue": db["system_vault"]["total_revenue"],
         "active_users": db["system_vault"]["active_users"],
         "total_sales": len(db.get("product_sales", []))
+    }
+
+# ---------- LEGAL ----------
+@app.get("/api/v2/legal")
+async def get_legal():
+    return {
+        "terms_of_service": "BioEmpire xizmatlaridan foydalanish shartlari...",
+        "privacy_policy": "Shaxsiy ma'lumotlarni himoya qilish siyosati...",
+        "rules": [
+            "Tizimdan faqat shaxsiy maqsadlarda foydalaning.",
+            "Boshqa foydalanuvchilarni haqorat qilmang.",
+            "Soxta ma'lumotlar kiritmang.",
+            "Tizim tomonidan berilgan tavsiyalar faqat maʼlumot uchun, shifokor maslahatini o'rnini bosa olmaydi."
+        ]
     }
 
 # ============================================================
